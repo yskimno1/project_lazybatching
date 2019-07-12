@@ -12,29 +12,18 @@
 
 #include <cublas_v2.h>
 #include <cudnn.h>
-//#include <cnmem.h>
-//TODO
-//#include "/home/mrhu/vdnn/cnmem/include/cnmem.h"
-
 #include <unistd.h>
 #include <time.h>
 #include <pthread.h>
-
 
 #ifdef USE_CPP_11
 #include <thread>
 #endif
 
 
-//-------------------------------
-// profiling individual layers
-//#define _PROFILE_INDIVIDUAL_LAYERS_ 1
 #define _PROFILE_FWD_ 1 
 #define _PROFILE_BWD_ 0
 int _PROFILE_LAYER_ID_  = 999;
-
-//#define _DEBUG_ 1
-//#define _ANALYSIS_ 1
 
 #define _REUSE_DISTANCE_ 1
 #define _USE_CNMEM_MEM_USAGE_ 1
@@ -99,20 +88,16 @@ int _PROFILE_LAYER_ID_  = 999;
 inline
 cudaError_t checkCuda(cudaError_t result)
 {
-
   if (result != cudaSuccess) {
     fprintf(stderr, "CUDA Runtime Error: %s\n", cudaGetErrorString(result));
-    //assert(result == cudaSuccess);
   }
-
   return result;
 }
 
-// mrhu
+
 // change both below
 #define value_type float
 #define DATA_PRECISION  CUDNN_DATA_FLOAT
-
 /*
 #define value_type short
 #define DATA_PRECISION  CUDNN_DATA_HALF

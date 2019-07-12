@@ -18,6 +18,7 @@
 #include <time.h>
 #include <pthread.h>
 
+// #include "model.h"
 
 #ifdef USE_CPP_11
 #include <thread>
@@ -31,14 +32,15 @@ enum layer_t
     RELU            = 3,
     FC              = 4,
     RNN             = 5,
-    NUM_LAYER_TYPES = 6
+    POLL_OUT        = 6,
+    NUM_LAYER_TYPES = 7
 };
 
 #define value_type float
 #define DATA_PRECISION  CUDNN_DATA_FLOAT
 
 #define MAX_BATCH_SIZE 16
-#define MAX_LAYER_NUM 5
+#define MAX_LAYER_NUM 9
 
 class Layer{
 public:
@@ -51,7 +53,8 @@ public:
         int _n, int _c, int _h, int _w,
         int _pad_h, int _pad_w, int _stride_h, int _stride_w,
         int _k, int _r, int _s,
-        int _n_out, int _c_out, int _h_out, int _w_out);
+        int _n_out, int _c_out, int _h_out, int _w_out, int _seqlength, int _hidden_size,
+        int _num_layers);
 
     ~Layer(){};
 
@@ -78,7 +81,6 @@ public:
 
     void          setDstData(void* point)     { this->dstData = point; }
 
-
     // mem usage
     size_t        memUsageSrcData();
     size_t        memUsageDstData();
@@ -95,7 +97,6 @@ public:
 
     void          decrementRefCntFwd()  { assert(refCntFwd>0);  refCntFwd--;  }
     void          decrementRefCntBwd()  { assert(refCntBwd>0);  refCntBwd--;  }
-
 
     // private:
     enum layer_t   layerType;
@@ -131,6 +132,7 @@ public:
     int       seqlength;
     int       hidden_size;
     int       num_layers;
+    int       unrolled_num[MAX_LAYER_NUM];
     // int       direction;
 
 

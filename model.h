@@ -20,18 +20,10 @@
 
 // #include "layer.h"
 
-enum model_mode{
-    DEFAULT_STATE   = 0,
-    GLOBAL          = 1,
-    LOCAL           = 2
-};
-
 struct Model_layer{
     Layer* list_layer[MAX_LAYER_NUM];
-    enum model_mode current_mode;
-    int current_index;
-    int global_index;
-    int data_exist;
+
+    bool data_exist;
 };
 
 struct Model_layer createModel(cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem, 
