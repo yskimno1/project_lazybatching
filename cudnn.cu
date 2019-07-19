@@ -24,11 +24,12 @@
 
 using namespace std;
 
-double input_time[] = {1, 1.3, 1.5, 1.6, 1.7, 1.8, 10};
+double input_time[] = {1, 1.2, 1.5, 1.6, 1.7, 1.8, 4};
 int input_unroll[] = {7, 12, 15, 6, 7, 8};
 int current_unroll[] = {0, 0, 0, 0, 0, 0};
 
-enum layer_t model_info[] = {CONV, CONV, CONV, CONV, CONV, CONV, CONV, CONV, RNN};
+enum layer_t model_info[] = {CONV_LAST};
+
 
 __global__ void initGPUData_ker(float *data, int numElements, float value) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -99,7 +100,6 @@ Layer::Layer(
   cudnnHandle_t*  _cudnnHandle,
   cudaStream_t*   _stream_compute,
   cudaStream_t*   _stream_memory,
-  int _id,
   int _n, int _c, int _h, int _w, 
   int _pad_h, int _pad_w, int _stride_h, int _stride_w, 
   int _k, int _r, int _s,
@@ -108,7 +108,6 @@ Layer::Layer(
   int _seqlength, int _hidden_size,
   int _num_layers):  layerType(_layerType), 
                             cudnnHandle(_cudnnHandle), stream_compute(_stream_compute), stream_memory(_stream_memory), 
-                            id(_id),
                             n_in(_n), c_in(_c), h_in(_h), w_in(_w),
                             pad_h(_pad_h), pad_w(_pad_w), stride_h(_stride_h), stride_w(_stride_w),
                             k(_k), r(_r), s(_s),
@@ -129,7 +128,7 @@ Layer::Layer(
   dstData       = NULL;
   diffData      = NULL; // input to layer when backprop
   gradData      = NULL; // output of layer when backprop
-  algo_int      = 4;
+  algo_int      = 2;
   fwdAlgo       = (cudnnConvolutionFwdAlgo_t) algo_int;
 
   inputmodeRNN  = CUDNN_LINEAR_INPUT;
@@ -271,8 +270,42 @@ Layer::Layer(
       value_type *filterData_h	= (value_type*)malloc(k*c_in*r*s*sizeof(value_type));
 
       for(unsigned i=0; i<k*c_in*r*s; i++)	filterData_h[i]	= (value_type)i/(k*c_in*r*s);
+      checkCuda(cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type)));
+    //   cudaMalloc(&dstData, n_out*c_out*h_out*w_out*sizeof(value_type));
+      checkCuda(cudaMalloc(&filterData, k*c_in*r*s*sizeof(value_type)));
+      checkCuda(cudaMalloc(&tempData, n_in*c_in*h_in*w_in*sizeof(value_type)));
+
+      checkCuda(cudaMemcpy(filterData, filterData_h, k*c_in*r*s*sizeof(value_type), cudaMemcpyHostToDevice));
+      // free memory
+      free(filterData_h);
+
+      // set input descriptors
+      checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
+      checkCUDNN(cudnnSetFilter4dDescriptor(filterDesc, dataType, tensorFormat, k, c_in, r, s));
+      checkCUDNN(cudnnSetConvolution2dDescriptor(convDesc, pad_h, pad_w, stride_w, stride_h, 1, 1, modeConv, CUDNN_DATA_FLOAT));
+
+      // find dimension of convolution output
+
+      checkCUDNN(cudnnGetConvolution2dForwardOutputDim(convDesc, srcTensorDesc, filterDesc, &n_out, &c_out, &h_out, &w_out));
+      // set output descriptor based on above
+      checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
+
+    }
+    break;
+
+  case CONV_LAST:
+    {
+      // create cudnn descriptors
+      checkCUDNN(cudnnCreateTensorDescriptor(&srcTensorDesc));
+      checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
+      checkCUDNN(cudnnCreateFilterDescriptor(&filterDesc));
+      checkCUDNN(cudnnCreateConvolutionDescriptor(&convDesc));
+
+      value_type *filterData_h	= (value_type*)malloc(k*c_in*r*s*sizeof(value_type));
+
+      for(unsigned i=0; i<k*c_in*r*s; i++)	filterData_h[i]	= (value_type)i/(k*c_in*r*s);
       cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type));
-      cudaMalloc(&dstData, n_out*c_out*h_out*w_out*sizeof(value_type));
+
       cudaMalloc(&filterData, k*c_in*r*s*sizeof(value_type));
       cudaMalloc(&tempData, n_in*c_in*h_in*w_in*sizeof(value_type));
 
@@ -286,11 +319,12 @@ Layer::Layer(
       checkCUDNN(cudnnSetConvolution2dDescriptor(convDesc, pad_h, pad_w, stride_w, stride_h, 1, 1, modeConv, CUDNN_DATA_FLOAT));
 
       // find dimension of convolution output
+
       checkCUDNN(cudnnGetConvolution2dForwardOutputDim(convDesc, srcTensorDesc, filterDesc, &n_out, &c_out, &h_out, &w_out));
 
       // set output descriptor based on above
       checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
-
+      cudaMalloc(&dstData, n_out*c_out*h_out*w_out*sizeof(value_type));
     }
     break;
 
@@ -312,20 +346,21 @@ Layer::Layer(
       // default behavior of RELU is to do in-place op
       this->inPlaceOp = true;
     break;
-//   case POOL:
-//         checkCUDNN(cudnnCreateTensorDescriptor(&srcTensorDesc));
-//         checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
-//         checkCUDNN(cudnnCreatePoolingDescriptor(&poolingDesc));
+  case POOL:
+        checkCUDNN(cudnnCreateTensorDescriptor(&srcTensorDesc));
+        checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
+        checkCUDNN(cudnnCreatePoolingDescriptor(&poolingDesc));
+        checkCuda(cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type)));
 
-//         // set input descriptors
-//         checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
-//         checkCUDNN(cudnnSetPooling2dDescriptor(poolingDesc, CUDNN_POOLING_MAX, r, s, pad_h, pad_w, stride_h, stride_w));
-//         // find dimension of pooling output
-//         checkCUDNN(cudnnGetPooling2dForwardOutputDim(poolingDesc, srcTensorDesc, &n_out, &c_out, &h_out, &w_out));
+        // set input descriptors
+        checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
+        checkCUDNN(cudnnSetPooling2dDescriptor(poolingDesc, CUDNN_POOLING_MAX, CUDNN_NOT_PROPAGATE_NAN, r, s, pad_h, pad_w, stride_h, stride_w));
+        // find dimension of pooling output
+        checkCUDNN(cudnnGetPooling2dForwardOutputDim(poolingDesc, srcTensorDesc, &n_out, &c_out, &h_out, &w_out));
 
-//         // set output descriptor based on above
-//         checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
-//     break;
+        // set output descriptor based on above
+        checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
+    break;
   default:
     assert(0);
     break;
@@ -336,68 +371,160 @@ Layer::Layer(
   checkCUDNN(cudnnCreateTensorDescriptor(&dstDiffTensorDesc));
 }
 
-struct Model_layer createModel(int type, cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem, 
-                    int n_in, int c_in, int h_in, int w_in, int pad_h, int pad_w, int stride_h, int stride_w, 
-                    int k, int r, int s, int n_out, int c_out, int h_out, int w_out, int seqlength, int hidden_size,
-                    int num_layers){
+struct Model_layer createModel(int type, cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem){
     struct Model_layer model;
-
-    for(int i=0; i<MAX_LAYER_NUM; i++){
-        model.list_layer[i] = new Layer(model_info[i], &cudnnHandle, &myStream_compute, &myStream_mem,
-                                i, n_in, c_in, h_in, w_in, pad_h, pad_w, stride_h, stride_w, k, r, s,
-                                n_out, c_out, h_out, w_out, seqlength, hidden_size, num_layers);
-    }
+    printf("type : %d\n", type);
     
-    model.data_exist = 0;
-    return model;
-}
+    if(type == 1){
+        model.list_layer[0] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 3, 224, 224,
+            3, 3, 2, 2,
+            64, 7, 7,
+            MAX_BATCH_SIZE, 64, 112, 112,
+            1, 20, 2000);
 
-struct Model_layer changeModel(struct Model_layer model, int index, cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem,
-                    int n_in, int c_in, int h_in, int w_in, int pad_h, int pad_w, int stride_h, int stride_w, 
-                    int k, int r, int s, int n_out, int c_out, int h_out, int w_out, int seqlength, int hidden_size,
-                    int num_layers){
+        model.list_layer[1] = new Layer(POOL, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 64, 112, 112,
+            0, 0, 2, 2,
+            64, 3, 3,
+            MAX_BATCH_SIZE, 64, 56, 56,
+            1, 20, 2000);
+        model.list_layer[0]->setDstData(model.list_layer[1]->SrcData());
 
-    int i;
-    for(i=index; i<MAX_LAYER_NUM; i++){
+        /* loop */
+        
+        model.list_layer[2] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 64, 56, 56,
+            0, 0, 1, 1,
+            64, 1, 1,
+            MAX_BATCH_SIZE, 64, 56, 56,
+            1, 20, 2000);
 
-        Layer* temp_layer = new Layer(model_info[i], &cudnnHandle, &myStream_compute, &myStream_mem,
-            i, n_in, c_in, h_in, w_in, pad_h, pad_w, stride_h, stride_w, k, r, s,
-            n_out, c_out, h_out, w_out, seqlength, hidden_size, num_layers);    
-        if(model_info[i] == CONV){
-            if(i==index){        
-                size_t temp_size = model.list_layer[index]->n_in * model.list_layer[index]->c_in * model.list_layer[index]->h_in * model.list_layer[index]->w_in * sizeof(value_type);
-                checkCuda(cudaMemcpy(temp_layer->srcData, model.list_layer[index]->tempData, temp_size, cudaMemcpyDeviceToDevice));
-                checkCuda(cudaMemcpy( (void *)((temp_layer->srcData) + temp_size), model.list_layer[index]->srcData, n_in*c_in*h_in*w_in*sizeof(value_type) - temp_size, cudaMemcpyDeviceToDevice));
-            }
-            cudaFree(model.list_layer[i]->srcData);
-            cudaFree(model.list_layer[i]->dstData);
-            cudaFree(model.list_layer[i]->tempData);
-            cudaFree(model.list_layer[i]->filterData);
-            delete model.list_layer[i];
+        model.list_layer[1]->setDstData(model.list_layer[2]->SrcData());
 
-            model.list_layer[i] = temp_layer; 
+        model.list_layer[3] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 64, 56, 56,
+            1, 1, 1, 1,
+            64, 3, 3,
+            MAX_BATCH_SIZE, 64, 56, 56,
+            1, 20, 2000);
+
+        model.list_layer[2]->setDstData(model.list_layer[3]->SrcData());
+
+        model.list_layer[4] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 64, 56, 56,
+            0, 0, 1, 1,
+            256, 1, 1,
+            MAX_BATCH_SIZE, 256, 56, 56,
+            1, 20, 2000);
+
+        model.list_layer[3]->setDstData(model.list_layer[4]->SrcData());
+
+        for(int k=0; k<2; k++){
+            model.list_layer[3*k+5] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+                MAX_BATCH_SIZE, 256, 56, 56,
+                0, 0, 1, 1,
+                64, 1, 1,
+                MAX_BATCH_SIZE, 64, 56, 56,
+                1, 20, 2000);
+    
+            model.list_layer[3*k+4]->setDstData(model.list_layer[3*k+5]->SrcData());
+    
+            model.list_layer[3*k+6] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+                MAX_BATCH_SIZE, 64, 56, 56,
+                1, 1, 1, 1,
+                64, 3, 3,
+                MAX_BATCH_SIZE, 64, 56, 56,
+                1, 20, 2000);
+    
+            model.list_layer[3*k+5]->setDstData(model.list_layer[3*k+6]->SrcData());
+    
+            model.list_layer[3*k+7] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+                MAX_BATCH_SIZE, 64, 56, 56,
+                0, 0, 1, 1,
+                256, 1, 1,
+                MAX_BATCH_SIZE, 256, 56, 56,
+                1, 20, 2000);
+    
+            model.list_layer[3*k+6]->setDstData(model.list_layer[3*k+7]->SrcData());
         }
 
-        else if(model_info[i] == RNN){
-            cudaFree(model.list_layer[i]->srcData);
-            cudaFree(model.list_layer[i]->hx);
-            cudaFree(model.list_layer[i]->cx);
-            cudaFree(model.list_layer[i]->hy);
-            cudaFree(model.list_layer[i]->cy);
-            cudaFree(model.list_layer[i]->states);
-            cudaFree(model.list_layer[i]->weight);
-            cudaFree(model.list_layer[i]->tempData);
+        /* second loop 1 */
 
-            delete model.list_layer[i];
-            // checkCuda(cudaMemcpy(temp_layer->srcData, model.list_layer[index]->dstData, ))
-            model.list_layer[i] = temp_layer;
-            printf("new layer type : %d\n", model.list_layer[i]->layerType);
+        model.list_layer[11] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 256, 56, 56,
+            0, 0, 2, 2,
+            128, 1, 1,
+            MAX_BATCH_SIZE, 128, 28, 28,
+            1, 20, 2000);
+        model.list_layer[10]->setDstData(model.list_layer[11]->SrcData());
+
+        model.list_layer[12] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 128, 28, 28,
+            1, 1, 1, 1,
+            128, 3, 3,
+            MAX_BATCH_SIZE, 128, 28, 28,
+            1, 20, 2000);
+        model.list_layer[11]->setDstData(model.list_layer[12]->SrcData());
+
+        model.list_layer[13] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 128, 28, 28,
+            0, 0, 1, 1,
+            512, 1, 1,
+            MAX_BATCH_SIZE, 512, 28, 28,
+            1, 20, 2000);        
+        model.list_layer[12]->setDstData(model.list_layer[13]->SrcData());
+
+        for(int k=0; k<4; k++){
+            model.list_layer[3*k+13] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+                MAX_BATCH_SIZE, 256, 56, 56,
+                0, 0, 2, 2,
+                128, 1, 1,
+                MAX_BATCH_SIZE, 128, 28, 28,
+                1, 20, 2000);
+            model.list_layer[3*k+12]->setDstData(model.list_layer[3*k+13]->SrcData());
+    
+            model.list_layer[3*k+14] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+                MAX_BATCH_SIZE, 128, 28, 28,
+                1, 1, 1, 1,
+                128, 3, 3,
+                MAX_BATCH_SIZE, 128, 28, 28,
+                1, 20, 2000);
+            model.list_layer[3*k+13]->setDstData(model.list_layer[3*k+14]->SrcData());
+    
+            model.list_layer[3*k+15] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+                MAX_BATCH_SIZE, 128, 28, 28,
+                0, 0, 1, 1,
+                512, 1, 1,
+                MAX_BATCH_SIZE, 512, 28, 28,
+                1, 20, 2000);        
+            model.list_layer[3*k+14]->setDstData(model.list_layer[3*k+15]->SrcData());
         }
-        else assert(0);
+
+        model.list_layer[25] = new Layer(CONV_LAST, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 512, 28, 28,
+            0, 0, 1, 1,
+            512, 1, 1,
+            MAX_BATCH_SIZE, 512, 28, 28,
+            1, 20, 2000);        
+        model.list_layer[24]->setDstData(model.list_layer[25]->SrcData());
+
     }
+    else{
+        for(int i=0; i<MAX_LAYER_NUM; i++){
+            model.list_layer[i] = new Layer(model_info[i], &cudnnHandle, &myStream_compute, &myStream_mem,
+                MAX_BATCH_SIZE, 64, 224, 224, 1, 1, 1, 1, 64, 3, 3,
+                MAX_BATCH_SIZE, 64, 112, 112, 1, 20, 2000);
+            if(i>0) model.list_layer[i-1]->setDstData(model.list_layer[i]->SrcData());
+        }
+    }
+    model.data_first = 0;
+    model.data_num = 0;
+    model.data_exist = 0;
 
     return model;
 }
+
 
 bool make_delay(void){
     return true;
@@ -428,18 +555,18 @@ bool merge_request(vector<struct vector_layer>* v_layer){
     struct vector_layer v_1 = (*v_layer)[idx_end];
     struct vector_layer v_2 = (*v_layer)[idx_end-1];
     if(v_1.idx_layer == v_2.idx_layer){
-
+        printf("before merge, request size : %d, current size - %d\n", v_2.idx_request.size(), (*v_layer).size());
         v_2.idx_request.insert(v_2.idx_request.end(), v_1.idx_request.begin(), v_1.idx_request.end());
         (*v_layer).pop_back();
         (*v_layer).pop_back();
         (*v_layer).push_back(v_2);
-        
+
+        printf("after merge, request size : %d, current size - %d\n", v_2.idx_request.size(), (*v_layer).size());
         return true;
     }
     else return false;
 
-    printf("before merge, request size : %d, current size - %d\n", v_2.idx_request.size(), (*v_layer).size());
-    printf("after merge, request size : %d, current size - %d\n", v_2.idx_request.size(), (*v_layer).size());
+
 }
 
 int main(int argc, char **argv)
@@ -464,64 +591,45 @@ int main(int argc, char **argv)
     checkCUDNN(cudnnSetStream(cudnnHandle, myStream_mem));
 
 	// NCHW spec for input feature map (fmap) 
-	int n_in	    = 1;
-	int c_in	    = 64;
-	int h_in	    = 112;
-    int w_in	    = 112;
 
-	int k		    = 64;
-	int r	    	= 3;
-	int s   		= 3;
-
-    int pad_h	    = 1;
-	int pad_w	    = 1;
-	int stride_h	= 1;
-    int stride_w	= 1;
-  
-    int n_out   	= 1;
-	int c_out	    = 64;
-	int h_out   	= 112;
-    int w_out	    = 112;
-
-    int seqlength   = 1;
-    int hidden_size = 20;
-    int num_layers  = 2000;
 
     vector<struct vector_layer> v_layer;
 
-    struct Model_layer model = createModel(0, cudnnHandle, myStream_compute, myStream_mem, 
-        n_in, c_in, h_in, w_in, pad_h, pad_w, stride_h, stride_w, 
-        k, r, s, n_out, c_out, h_out, w_out, seqlength, hidden_size, num_layers);
+    struct Model_layer model = createModel(MODEL_TYPE, cudnnHandle, myStream_compute, myStream_mem);
 
     value_type alpha = value_type(1);
     value_type beta  = value_type(0);
  
     start = clock();
     int num_input = sizeof(input_time)/sizeof(input_time[0]);
-
     /* --------------------------------------------------------------- */
     /* --------------------------------------------------------------- */
     /* --------------------------------------------------------------- */
-
+    bool stall = false;
     while(input_index <= num_input){
-
+        
         double now = get_current_time(start);
+        stall = false;
+        if(model.data_num >= MAX_BATCH_SIZE) stall = true;
+        
 
         /* New input condition */
-        if(input_index != num_input && now > input_time[input_index]){ 
+        if(stall==false && input_index != num_input && now > input_time[input_index]){ 
+            
             struct vector_layer v_new = set_vector(0, input_index, input_unroll[input_index]);
             
             v_layer.push_back(v_new);
             input_index += 1;
             printf("--came at time : %lf--\n", now);
+            printf("--input index : %d\n", input_index);
+
+            // size_t temp_size = 1 * c_in * h_in * w_in * sizeof(value_type);
+            // printf("temp size : %d\n", temp_size);
+            // checkCuda(cudaMemset((void *)(model.list_layer[0]->srcData + (model.data_first + model.data_num)*temp_size), 1, temp_size));            
+            model.data_num += 1;
 
             if(merge_request(&v_layer)){
-                int index = v_layer[v_layer.size()-1].idx_layer;
-                int n_new = v_layer[v_layer.size()-1].idx_request.size();
-
-                model = changeModel(model, index, cudnnHandle, myStream_compute, myStream_mem,
-                    n_new, c_in, h_in, w_in, pad_h, pad_w, stride_h, stride_w, 
-                    k, r, s, n_new, c_out, h_out, w_out, seqlength, hidden_size, num_layers);
+                printf("merged!\n");
             }
         }
 
@@ -531,12 +639,14 @@ int main(int argc, char **argv)
             void* workSpace=NULL;
             size_t sizeInBytes=0;
 
+            std::cout<<"current req num: "<<model.data_num<<", starts at "<<model.data_first<<std::endl;
+
             int idx_end = v_layer.size()-1;
             struct vector_layer v_now = v_layer[idx_end];
             v_layer.pop_back();
 
             Layer* current_index_layer = model.list_layer[v_now.idx_layer];
-            if(current_index_layer->layerType == CONV){
+            if(current_index_layer->layerType == CONV || current_index_layer->layerType == CONV_LAST){
                 checkCUDNN(cudnnGetConvolutionForwardWorkspaceSize(cudnnHandle,
                                                         current_index_layer->srcTensorDesc,
                                                         current_index_layer->filterDesc,
@@ -544,56 +654,69 @@ int main(int argc, char **argv)
                                                         current_index_layer->dstTensorDesc,
                                                         current_index_layer->fwdAlgo,
                                                         &sizeInBytes));
+
                 std::cout<<"[Note] CONV WorkingSpace required: "<<sizeInBytes<<" (bytes)"<<std::endl;
                 if(sizeInBytes!=0)  checkCuda(cudaMalloc(&workSpace, sizeInBytes));
                 
-                if(idx_end>0){
-                    struct vector_layer v_next = v_layer[idx_end-1];
-                    if(v_next.idx_layer == v_now.idx_layer +1){
-                        int n_in = model.list_layer[v_next.idx_layer]->n_in;
-                        int c_in = model.list_layer[v_next.idx_layer]->c_in;
-                        int h_in = model.list_layer[v_next.idx_layer]->h_in;
-                        int w_in = model.list_layer[v_next.idx_layer]->w_in;
-                        checkCuda(cudaMemcpy(model.list_layer[v_next.idx_layer]->tempData, model.list_layer[v_next.idx_layer]->srcData,
-                            n_in*c_in*h_in*w_in*sizeof(value_type), cudaMemcpyDeviceToDevice));
-                    }
-                }
-
                 checkCUDNN(cudnnConvolutionForward( cudnnHandle, &alpha, current_index_layer->srcTensorDesc,
-                                                    current_index_layer->srcData,
-                                                    current_index_layer->filterDesc,
-                                                    current_index_layer->filterData,
-                                                    current_index_layer->convDesc,
-                                                    current_index_layer->fwdAlgo,
-                                                    workSpace,
-                                                    sizeInBytes,
-                                                    &beta,
-                                                    current_index_layer->dstTensorDesc,
-                                                    current_index_layer->dstData));
+                                                current_index_layer->srcData,
+                                                current_index_layer->filterDesc,
+                                                current_index_layer->filterData,
+                                                current_index_layer->convDesc,
+                                                current_index_layer->fwdAlgo,
+                                                workSpace,
+                                                sizeInBytes,
+                                                &beta,
+                                                current_index_layer->dstTensorDesc,
+                                                current_index_layer->dstData));
+
+
                 printf("Passed index no%d at time %lf\n", v_now.idx_layer, now);
                 v_now.idx_layer += 1;
                 
                 if(v_now.idx_layer >= MAX_LAYER_NUM){
+                    int request_done = v_now.idx_request.size();
+                    model.data_first += request_done;
+                    model.data_num -= request_done;
+
                     if(sizeInBytes !=0) cudaFree(workSpace);
                     if(input_index == num_input) break;
                 }
                 else{
-                    checkCuda(cudaMemcpy(model.list_layer[v_now.idx_layer]->srcData, current_index_layer->dstData,
-                                            n_in*c_in*h_in*w_in*sizeof(value_type), cudaMemcpyDeviceToDevice));
                     v_layer.push_back(v_now);
-                    
                     if(merge_request(&v_layer)){
-                        int index = v_layer[v_layer.size()-1].idx_layer;
-                        int n_new = v_layer[v_layer.size()-1].idx_request.size();
-
-                        model = changeModel(model, index, cudnnHandle, myStream_compute, myStream_mem,
-                            n_new, c_in, h_in, w_in, pad_h, pad_w, stride_h, stride_w, 
-                            k, r, s, n_new, c_out, h_out, w_out, seqlength, hidden_size, num_layers);
+                        printf("merged!\n");
                     }
                     if(sizeInBytes !=0) cudaFree(workSpace);
                 }
             }
+            else if(current_index_layer->layerType == POOL){
 
+                std::cout<<"[Note] Pooling Layer"<<std::endl;
+                
+                checkCUDNN(cudnnPoolingForward( cudnnHandle, current_index_layer->poolingDesc, &alpha, current_index_layer->srcTensorDesc,
+                    current_index_layer->srcData,
+                    &beta,
+                    current_index_layer->dstTensorDesc,
+                    current_index_layer->dstData));
+
+                printf("Passed index no%d at time %lf\n", v_now.idx_layer, now);
+                v_now.idx_layer += 1;
+                
+                if(v_now.idx_layer >= MAX_LAYER_NUM){
+                    int request_done = v_now.idx_request.size();
+                    model.data_first += request_done;
+                    model.data_num -= request_done;
+
+                    if(input_index == num_input) break;
+                }
+                else{
+                    v_layer.push_back(v_now);
+                    if(merge_request(&v_layer)){
+                        printf("merged!\n");
+                    }
+                }
+            }
             else{
                 checkCUDNN(cudnnGetRNNWorkspaceSize(cudnnHandle, current_index_layer->rnnDesc,
                                                     current_index_layer->seqlength, current_index_layer->xDesc,
@@ -603,12 +726,12 @@ int main(int argc, char **argv)
                 if(idx_end>0){
                     struct vector_layer v_next = v_layer[idx_end-1];
                     if(v_next.idx_layer == v_now.idx_layer +1){
-                        int n_in = model.list_layer[v_next.idx_layer]->n_in;
-                        int c_in = model.list_layer[v_next.idx_layer]->c_in;
-                        int h_in = model.list_layer[v_next.idx_layer]->h_in;
-                        int w_in = model.list_layer[v_next.idx_layer]->w_in;
-                        checkCuda(cudaMemcpy(model.list_layer[v_next.idx_layer]->tempData, model.list_layer[v_next.idx_layer]->srcData,
-                            n_in*c_in*h_in*w_in*sizeof(value_type), cudaMemcpyDeviceToDevice));
+                        // int n_in = model.list_layer[v_next.idx_layer]->n_in;
+                        // int c_in = model.list_layer[v_next.idx_layer]->c_in;
+                        // int h_in = model.list_layer[v_next.idx_layer]->h_in;
+                        // int w_in = model.list_layer[v_next.idx_layer]->w_in;
+                        // checkCuda(cudaMemcpy(model.list_layer[v_next.idx_layer]->tempData, model.list_layer[v_next.idx_layer]->srcData,
+                        //     n_in*c_in*h_in*w_in*sizeof(value_type), cudaMemcpyDeviceToDevice));
                     }
                 }
 
@@ -648,18 +771,16 @@ int main(int argc, char **argv)
                 if(req_passed==0){
                     v_now.idx_layer += 1;
                     if(v_now.idx_layer >= MAX_LAYER_NUM){
+                        int request_done = v_now.idx_request.size();
+                        model.data_first += request_done;
+                        model.data_num -= request_done;
+
                         if(input_index == num_input) break;
                     }
                     else{
                         v_layer.push_back(v_now);
                         if(merge_request(&v_layer)){
-
-                            int index = v_layer[v_layer.size()-1].idx_layer;
-                            int n_new = v_layer[v_layer.size()-1].idx_request.size();
-
-                            model = changeModel(model, index, cudnnHandle, myStream_compute, myStream_mem,
-                                n_new, c_in, h_in, w_in, pad_h, pad_w, stride_h, stride_w, 
-                                k, r, s, n_new, c_out, h_out, w_out, seqlength, hidden_size, num_layers);
+                            printf("merged!\n");
                         }
                     }
                 }

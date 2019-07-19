@@ -33,14 +33,24 @@ enum layer_t
     FC              = 4,
     RNN             = 5,
     POLL_OUT        = 6,
-    NUM_LAYER_TYPES = 7
+    POOL            = 7,
+    NUM_LAYER_TYPES = 8
+};
+
+enum model_t
+{
+    DEFAULT         = 0,
+    RESNET          = 1
+
 };
 
 #define value_type float
 #define DATA_PRECISION  CUDNN_DATA_FLOAT
+#define MAX_BATCH_SIZE 4
 
-#define MAX_BATCH_SIZE 16
-#define MAX_LAYER_NUM 9
+#define MODEL_TYPE 1
+#define MAX_LAYER_NUM 26
+
 
 class Layer{
 public:
@@ -49,7 +59,6 @@ public:
         cudnnHandle_t*  _cudnnHandle,
         cudaStream_t*   _stream_compute,
         cudaStream_t*   _stream_memory,
-        int _id,
         int _n, int _c, int _h, int _w,
         int _pad_h, int _pad_w, int _stride_h, int _stride_w,
         int _k, int _r, int _s,
