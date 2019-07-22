@@ -8,6 +8,11 @@
 #include <iostream>
 #include <assert.h>
 
+#include <ctype.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
+
 #include <cudnn.h>
 #include <cublas_v2.h>
 
@@ -24,12 +29,7 @@
 
 using namespace std;
 
-double input_time[] = {1, 1.2, 1.5, 1.6, 1.7, 1.8, 4};
-int input_unroll[] = {7, 12, 15, 6, 7, 8};
-int current_unroll[] = {0, 0, 0, 0, 0, 0};
-
 enum layer_t model_info[] = {CONV_LAST};
-
 
 __global__ void initGPUData_ker(float *data, int numElements, float value) {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -106,13 +106,14 @@ Layer::Layer(
   int _n_out, int _c_out,
   int _h_out, int _w_out,
   int _seqlength, int _hidden_size,
-  int _num_layers):  layerType(_layerType), 
+  int _num_layers,
+  int _idx):  layerType(_layerType), 
                             cudnnHandle(_cudnnHandle), stream_compute(_stream_compute), stream_memory(_stream_memory), 
                             n_in(_n), c_in(_c), h_in(_h), w_in(_w),
                             pad_h(_pad_h), pad_w(_pad_w), stride_h(_stride_h), stride_w(_stride_w),
                             k(_k), r(_r), s(_s),
                             n_out(_n_out), c_out(_c_out), h_out(_h_out), w_out(_w_out),
-                            seqlength(_seqlength), hidden_size(_hidden_size), num_layers(_num_layers)
+                            seqlength(_seqlength), hidden_size(_hidden_size), num_layers(_num_layers), idx(_idx)
 {
 
   // default    
@@ -142,6 +143,7 @@ Layer::Layer(
   cx = NULL;
   hy = NULL;
   cy = NULL;
+
 
   switch(_layerType) {
   case RNN:
@@ -301,6 +303,7 @@ Layer::Layer(
 
       for(unsigned i=0; i<k*c_in*r*s; i++)	filterData_h[i]	= (value_type)i/(k*c_in*r*s);
       checkCuda(cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type)));
+    //   checkCuda(cudaMalloc(&biasData, n_in*c_in*h_in*w_in*sizeof(value_type)));
     //   cudaMalloc(&dstData, n_out*c_out*h_out*w_out*sizeof(value_type));
       checkCuda(cudaMalloc(&filterData, k*c_in*r*s*sizeof(value_type)));
       checkCuda(cudaMalloc(&tempData, n_in*c_in*h_in*w_in*sizeof(value_type)));
@@ -313,7 +316,7 @@ Layer::Layer(
       checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
       checkCUDNN(cudnnSetFilter4dDescriptor(filterDesc, dataType, tensorFormat, k, c_in, r, s));
       checkCUDNN(cudnnSetConvolution2dDescriptor(convDesc, pad_h, pad_w, stride_w, stride_h, 1, 1, modeConv, CUDNN_DATA_FLOAT));
-      checkCUDNN(cudnnSetTensor4dDescriptor(biasTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
+      checkCUDNN(cudnnSetTensor4dDescriptor(biasTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
       // find dimension of convolution output
 
       checkCUDNN(cudnnGetConvolution2dForwardOutputDim(convDesc, srcTensorDesc, filterDesc, &n_out, &c_out, &h_out, &w_out));
@@ -408,12 +411,7 @@ Layer::Layer(
         // set output descriptor based on above
         checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
       break;
-    case RESIDUAL:
-        checkCUDNN(cudnnCreateTensorDescriptor(&srcTensorDesc));
-        checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
-        checkCuda(cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type)));
 
-      break;
   default:
     printf("layer %d\n", _layerType);
     assert(0);
@@ -432,14 +430,14 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         3, 3, 2, 2,
         64, 7, 7,
         MAX_BATCH_SIZE, 64, 112, 112,
-        1, 20, 2000);
+        1, 20, 2000, 0);
 
     model.list_layer[1] = new Layer(POOL, &cudnnHandle, &myStream_compute, &myStream_mem,
         MAX_BATCH_SIZE, 64, 112, 112,
         0, 0, 2, 2,
         64, 3, 3,
         MAX_BATCH_SIZE, 64, 56, 56,
-        1, 20, 2000);
+        1, 20, 2000, 1);
     model.list_layer[0]->setDstData(model.list_layer[1]->SrcData());
 
     /* loop */
@@ -449,7 +447,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 1, 1,
         64, 1, 1,
         MAX_BATCH_SIZE, 64, 56, 56,
-        1, 20, 2000);
+        1, 20, 2000, 2);
 
     model.list_layer[1]->setDstData(model.list_layer[2]->SrcData());
 
@@ -458,7 +456,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         1, 1, 1, 1,
         64, 3, 3,
         MAX_BATCH_SIZE, 64, 56, 56,
-        1, 20, 2000);
+        1, 20, 2000, 3);
 
     model.list_layer[2]->setDstData(model.list_layer[3]->SrcData());
 
@@ -467,7 +465,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 1, 1,
         256, 1, 1,
         MAX_BATCH_SIZE, 256, 56, 56,
-        1, 20, 2000);
+        1, 20, 2000, 4);
 
     model.list_layer[3]->setDstData(model.list_layer[4]->SrcData());
 
@@ -478,7 +476,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             64, 1, 1,
             MAX_BATCH_SIZE, 64, 56, 56,
-            1, 20, 2000);
+            1, 20, 2000, 3*k+2);
 
         model.list_layer[3*k+1]->setDstData(model.list_layer[3*k+2]->SrcData());
 
@@ -487,7 +485,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             1, 1, 1, 1,
             64, 3, 3,
             MAX_BATCH_SIZE, 64, 56, 56,
-            1, 20, 2000);
+            1, 20, 2000, 3*k+3);
 
         model.list_layer[3*k+2]->setDstData(model.list_layer[3*k+3]->SrcData());
 
@@ -496,7 +494,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             256, 1, 1,
             MAX_BATCH_SIZE, 256, 56, 56,
-            1, 20, 2000);
+            1, 20, 2000, 3*k+4);
 
         model.list_layer[3*k+3]->setDstData(model.list_layer[3*k+4]->SrcData());
     }
@@ -508,7 +506,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 2, 2,
         128, 1, 1,
         MAX_BATCH_SIZE, 128, 28, 28,
-        1, 20, 2000);
+        1, 20, 2000, 11);
     model.list_layer[10]->setDstData(model.list_layer[11]->SrcData());
 
     model.list_layer[12] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -516,7 +514,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         1, 1, 1, 1,
         128, 3, 3,
         MAX_BATCH_SIZE, 128, 28, 28,
-        1, 20, 2000);
+        1, 20, 2000, 12);
     model.list_layer[11]->setDstData(model.list_layer[12]->SrcData());
 
     model.list_layer[13] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -524,7 +522,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 1, 1,
         512, 1, 1,
         MAX_BATCH_SIZE, 512, 28, 28,
-        1, 20, 2000);        
+        1, 20, 2000, 13);        
     model.list_layer[12]->setDstData(model.list_layer[13]->SrcData());
 
     for(int k=1; k<4; k++){
@@ -533,7 +531,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             128, 1, 1,
             MAX_BATCH_SIZE, 128, 28, 28,
-            1, 20, 2000);
+            1, 20, 2000, 3*k+11);
         model.list_layer[3*k+10]->setDstData(model.list_layer[3*k+11]->SrcData());
 
         model.list_layer[3*k+12] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -541,7 +539,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             1, 1, 1, 1,
             128, 3, 3,
             MAX_BATCH_SIZE, 128, 28, 28,
-            1, 20, 2000);
+            1, 20, 2000, 3*k+12);
         model.list_layer[3*k+11]->setDstData(model.list_layer[3*k+12]->SrcData());
 
         model.list_layer[3*k+13] = new Layer(CONV_RESIDUAL, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -549,7 +547,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             512, 1, 1,
             MAX_BATCH_SIZE, 512, 28, 28,
-            1, 20, 2000);        
+            1, 20, 2000, 3*k+13);        
         model.list_layer[3*k+12]->setDstData(model.list_layer[3*k+13]->SrcData());
     }
 
@@ -559,7 +557,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 2, 2,
         256, 1, 1,
         MAX_BATCH_SIZE, 256, 14, 14,
-        1, 20, 2000);        
+        1, 20, 2000, 23);        
     model.list_layer[22]->setDstData(model.list_layer[23]->SrcData());
 
     model.list_layer[24] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -567,7 +565,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         1, 1, 1, 1,
         256, 3, 3,
         MAX_BATCH_SIZE, 256, 14, 14,
-        1, 20, 2000);        
+        1, 20, 2000, 24);        
     model.list_layer[23]->setDstData(model.list_layer[24]->SrcData());
 
     model.list_layer[25] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -575,7 +573,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 1, 1,
         1024, 1, 1,
         MAX_BATCH_SIZE, 1024, 14, 14,
-        1, 20, 2000);        
+        1, 20, 2000, 25);        
     model.list_layer[24]->setDstData(model.list_layer[25]->SrcData());
 
     for(int k=1; k<6; k++){
@@ -584,7 +582,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             256, 1, 1,
             MAX_BATCH_SIZE, 256, 14, 14,
-            1, 20, 2000);        
+            1, 20, 2000, 3*k+23);        
         model.list_layer[3*k+22]->setDstData(model.list_layer[3*k+23]->SrcData());
     
         model.list_layer[3*k+24] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -592,7 +590,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             1, 1, 1, 1,
             256, 3, 3,
             MAX_BATCH_SIZE, 256, 14, 14,
-            1, 20, 2000);        
+            1, 20, 2000, 3*k+24);        
         model.list_layer[3*k+23]->setDstData(model.list_layer[3*k+24]->SrcData());
     
         model.list_layer[3*k+25] = new Layer(CONV_RESIDUAL, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -600,7 +598,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             1024, 1, 1,
             MAX_BATCH_SIZE, 1024, 14, 14,
-            1, 20, 2000);        
+            1, 20, 2000, 3*k+25);        
         model.list_layer[3*k+24]->setDstData(model.list_layer[3*k+25]->SrcData());
     }
 
@@ -610,7 +608,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 2, 2,
         512, 1, 1,
         MAX_BATCH_SIZE, 512, 7, 7,
-        1, 20, 2000);        
+        1, 20, 2000, 41);        
     model.list_layer[40]->setDstData(model.list_layer[41]->SrcData());
 
     model.list_layer[42] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -618,7 +616,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         1, 1, 1, 1,
         512, 3, 3,
         MAX_BATCH_SIZE, 512, 7, 7,
-        1, 20, 2000);        
+        1, 20, 2000, 42);        
     model.list_layer[41]->setDstData(model.list_layer[42]->SrcData());
 
     model.list_layer[43] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -626,7 +624,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 1, 1,
         2048, 1, 1,
         MAX_BATCH_SIZE, 2048, 7, 7,
-        1, 20, 2000);        
+        1, 20, 2000, 43);        
     model.list_layer[42]->setDstData(model.list_layer[43]->SrcData());
 
     for(int k=1; k<3; k++){
@@ -635,7 +633,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             512, 1, 1,
             MAX_BATCH_SIZE, 512, 7, 7,
-            1, 20, 2000);        
+            1, 20, 2000, 3*k+41);        
         model.list_layer[3*k+40]->setDstData(model.list_layer[3*k+41]->SrcData());
     
         model.list_layer[3*k+42] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -643,7 +641,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             1, 1, 1, 1,
             512, 3, 3,
             MAX_BATCH_SIZE, 512, 7, 7,
-            1, 20, 2000);        
+            1, 20, 2000, 3*k+42);        
         model.list_layer[3*k+41]->setDstData(model.list_layer[3*k+42]->SrcData());
     
         model.list_layer[3*k+43] = new Layer(CONV_RESIDUAL, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -651,7 +649,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
             0, 0, 1, 1,
             2048, 1, 1,
             MAX_BATCH_SIZE, 2048, 7, 7,
-            1, 20, 2000);        
+            1, 20, 2000, 3*k+43);        
         model.list_layer[3*k+42]->setDstData(model.list_layer[3*k+43]->SrcData());
     }
 
@@ -660,7 +658,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 1, 1,
         2048, 7, 7,
         MAX_BATCH_SIZE, 2048, 1, 1,
-        1, 20, 2000);
+        1, 20, 2000, 50);
     model.list_layer[49]->setDstData(model.list_layer[50]->SrcData());
 
     model.list_layer[51] = new Layer(CONV_LAST, &cudnnHandle, &myStream_compute, &myStream_mem,
@@ -668,7 +666,7 @@ struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStrea
         0, 0, 1, 1,
         1, 1, 1,
         MAX_BATCH_SIZE, 2048, 1, 1,
-        1, 20, 2000);
+        1, 20, 2000, 51);
     model.list_layer[50]->setDstData(model.list_layer[51]->SrcData());
 
     return model;
@@ -686,7 +684,7 @@ struct Model_layer createModel(int type, cudnnHandle_t cudnnHandle, cudaStream_t
         for(int i=0; i<MAX_LAYER_NUM; i++){
             model.list_layer[i] = new Layer(model_info[i], &cudnnHandle, &myStream_compute, &myStream_mem,
                 MAX_BATCH_SIZE, 64, 224, 224, 1, 1, 1, 1, 64, 3, 3,
-                MAX_BATCH_SIZE, 64, 112, 112, 1, 20, 2000);
+                MAX_BATCH_SIZE, 64, 112, 112, 1, 20, 2000, i);
             if(i>0) model.list_layer[i-1]->setDstData(model.list_layer[i]->SrcData());
         }
     }
@@ -743,6 +741,37 @@ bool merge_request(vector<struct vector_layer>* v_layer){
 
 int main(int argc, char **argv)
 {
+
+    double input_time[] = {1, 1.01, 1.011, 1.02, 1.022, 1.025, 1.5};
+    int input_unroll[] = {7, 12, 15, 6, 7, 8};
+    int current_unroll[] = {0, 0, 0, 0, 0, 0};
+
+    ifstream in(argv[1]);
+    string s;
+    char buf[100];
+
+    vector<float> request_vector;
+    vector<int> request_unroll;
+    vector<int> request_current_unroll;
+    int request_number;
+
+    if(in.is_open()){
+        while(in){
+            in.getline(buf, 100, ',');
+            if(strlen(buf)) request_vector.push_back(atof(buf));
+        }
+
+        request_number = request_vector.size();
+        printf("request num : %d\n", request_number);
+
+        for(int i=0; i<request_number; i++){
+            request_unroll.push_back(5);
+            request_current_unroll.push_back(0);
+        }
+
+    }
+    else exit(-1);
+
     /* ---------------------------- setup ---------------------------- */
     clock_t start;
 
@@ -794,10 +823,7 @@ int main(int argc, char **argv)
             input_index += 1;
             printf("--came at time : %lf--\n", now);
             printf("--input index : %d\n", input_index);
-
-            // size_t temp_size = 1 * c_in * h_in * w_in * sizeof(value_type);
-            // printf("temp size : %d\n", temp_size);
-            // checkCuda(cudaMemset((void *)(model.list_layer[0]->srcData + (model.data_first + model.data_num)*temp_size), 1, temp_size));            
+           
             model.data_num += 1;
 
             if(merge_request(&v_layer)){
@@ -818,7 +844,7 @@ int main(int argc, char **argv)
             v_layer.pop_back();
 
             Layer* current_index_layer = model.list_layer[v_now.idx_layer];
-            if(current_index_layer->layerType == CONV || current_index_layer->layerType == CONV_LAST){
+            if(current_index_layer->layerType == CONV || current_index_layer->layerType == CONV_LAST || current_index_layer->layerType == CONV_RESIDUAL){
                 checkCUDNN(cudnnGetConvolutionForwardWorkspaceSize(cudnnHandle,
                                                         current_index_layer->srcTensorDesc,
                                                         current_index_layer->filterDesc,
@@ -843,17 +869,20 @@ int main(int argc, char **argv)
                                                 current_index_layer->dstData));
 
                 if(current_index_layer->layerType == CONV_RESIDUAL){
-                    checkCUDNN(cudnnAddTensor(  *cudnnHandle, 
+                    Layer* bias_layer = model.list_layer[current_index_layer->idx -3];
+                    current_index_layer->biasData = bias_layer->dstData;
+                    
+                    checkCUDNN(cudnnAddTensor( cudnnHandle, 
                         &alpha, 
-                        biasTensorDesc,
-                        biasData,
-                        &alpha,
-                        dstTensorDesc,
-                        dstData
+                        current_index_layer->biasTensorDesc,
+                        current_index_layer->biasData,
+                        &beta,
+                        current_index_layer->dstTensorDesc,
+                        current_index_layer->dstData
                       ));
                 }
 
-                printf("Passed index no%d at time %lf\n", v_now.idx_layer, now);
+                printf("Passed index %d at time %lf\n\n", v_now.idx_layer, now);
                 v_now.idx_layer += 1;
                 
                 if(v_now.idx_layer >= MAX_LAYER_NUM){
@@ -882,7 +911,7 @@ int main(int argc, char **argv)
                     current_index_layer->dstTensorDesc,
                     current_index_layer->dstData));
 
-                printf("Passed index no%d at time %lf\n", v_now.idx_layer, now);
+                printf("Passed index %d at time %lf\n\n", v_now.idx_layer, now);
                 v_now.idx_layer += 1;
                 
                 if(v_now.idx_layer >= MAX_LAYER_NUM){
@@ -935,7 +964,7 @@ int main(int argc, char **argv)
                                                     current_index_layer->cy,
                                                     workSpace,
                                                     sizeInBytes));
-                printf("Passed index no.%d at time %lf\n", v_now.idx_layer, now);
+                printf("Passed index %d at time %lf\n\n", v_now.idx_layer, now);
                 if(sizeInBytes !=0) cudaFree(workSpace);
                 
                 vector<int>::iterator iter=v_now.idx_request.begin();

@@ -62,7 +62,7 @@ public:
         int _pad_h, int _pad_w, int _stride_h, int _stride_w,
         int _k, int _r, int _s,
         int _n_out, int _c_out, int _h_out, int _w_out, int _seqlength, int _hidden_size,
-        int _num_layers);
+        int _num_layers, int idx);
 
     ~Layer(){};
 
@@ -142,7 +142,7 @@ public:
     int       num_layers;
     int       unrolled_num[MAX_LAYER_NUM];
     // int       direction;
-
+    int idx;
 
     void *hx;
     void *cx;
