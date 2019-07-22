@@ -24,6 +24,12 @@
 #include <thread>
 #endif
 
+#define value_type float
+#define DATA_PRECISION CUDNN_DATA_FLOAT
+#define MAX_BATCH_SIZE 4
+#define MODEL_TYPE 1
+#define MAX_LAYER_NUM 52
+
 enum layer_t
 {
     CONV_FIRST      = 0,
@@ -32,9 +38,10 @@ enum layer_t
     RELU            = 3,
     FC              = 4,
     RNN             = 5,
-    POLL_OUT        = 6,
+    POOL_AVERAGE    = 6,
     POOL            = 7,
-    NUM_LAYER_TYPES = 8
+    CONV_RESIDUAL   = 8,
+    NUM_LAYER_TYPES = 9
 };
 
 enum model_t
@@ -43,14 +50,6 @@ enum model_t
     RESNET          = 1
 
 };
-
-#define value_type float
-#define DATA_PRECISION  CUDNN_DATA_FLOAT
-#define MAX_BATCH_SIZE 4
-
-#define MODEL_TYPE 1
-#define MAX_LAYER_NUM 26
-
 
 class Layer{
 public:

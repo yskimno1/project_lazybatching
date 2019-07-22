@@ -144,11 +144,6 @@ Layer::Layer(
   cy = NULL;
 
   switch(_layerType) {
-
-  case FC:
-    {
-
-    }
   case RNN:
     {
         assert(n_in == n_out);
@@ -266,6 +261,7 @@ Layer::Layer(
       checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
       checkCUDNN(cudnnCreateFilterDescriptor(&filterDesc));
       checkCUDNN(cudnnCreateConvolutionDescriptor(&convDesc));
+      checkCUDNN(cudnnCreateTensorDescriptor(&biasTensorDesc));
 
       value_type *filterData_h	= (value_type*)malloc(k*c_in*r*s*sizeof(value_type));
 
@@ -283,7 +279,41 @@ Layer::Layer(
       checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
       checkCUDNN(cudnnSetFilter4dDescriptor(filterDesc, dataType, tensorFormat, k, c_in, r, s));
       checkCUDNN(cudnnSetConvolution2dDescriptor(convDesc, pad_h, pad_w, stride_w, stride_h, 1, 1, modeConv, CUDNN_DATA_FLOAT));
+      checkCUDNN(cudnnSetTensor4dDescriptor(biasTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
+      // find dimension of convolution output
 
+      checkCUDNN(cudnnGetConvolution2dForwardOutputDim(convDesc, srcTensorDesc, filterDesc, &n_out, &c_out, &h_out, &w_out));
+      // set output descriptor based on above
+      checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
+
+    }
+    break;
+  case CONV_RESIDUAL:
+    {
+      // create cudnn descriptors
+      checkCUDNN(cudnnCreateTensorDescriptor(&srcTensorDesc));
+      checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
+      checkCUDNN(cudnnCreateFilterDescriptor(&filterDesc));
+      checkCUDNN(cudnnCreateConvolutionDescriptor(&convDesc));
+      checkCUDNN(cudnnCreateTensorDescriptor(&biasTensorDesc));
+
+      value_type *filterData_h	= (value_type*)malloc(k*c_in*r*s*sizeof(value_type));
+
+      for(unsigned i=0; i<k*c_in*r*s; i++)	filterData_h[i]	= (value_type)i/(k*c_in*r*s);
+      checkCuda(cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type)));
+    //   cudaMalloc(&dstData, n_out*c_out*h_out*w_out*sizeof(value_type));
+      checkCuda(cudaMalloc(&filterData, k*c_in*r*s*sizeof(value_type)));
+      checkCuda(cudaMalloc(&tempData, n_in*c_in*h_in*w_in*sizeof(value_type)));
+
+      checkCuda(cudaMemcpy(filterData, filterData_h, k*c_in*r*s*sizeof(value_type), cudaMemcpyHostToDevice));
+      // free memory
+      free(filterData_h);
+
+      // set input descriptors
+      checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
+      checkCUDNN(cudnnSetFilter4dDescriptor(filterDesc, dataType, tensorFormat, k, c_in, r, s));
+      checkCUDNN(cudnnSetConvolution2dDescriptor(convDesc, pad_h, pad_w, stride_w, stride_h, 1, 1, modeConv, CUDNN_DATA_FLOAT));
+      checkCUDNN(cudnnSetTensor4dDescriptor(biasTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
       // find dimension of convolution output
 
       checkCUDNN(cudnnGetConvolution2dForwardOutputDim(convDesc, srcTensorDesc, filterDesc, &n_out, &c_out, &h_out, &w_out));
@@ -300,6 +330,7 @@ Layer::Layer(
       checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
       checkCUDNN(cudnnCreateFilterDescriptor(&filterDesc));
       checkCUDNN(cudnnCreateConvolutionDescriptor(&convDesc));
+      checkCUDNN(cudnnCreateTensorDescriptor(&biasTensorDesc));
 
       value_type *filterData_h	= (value_type*)malloc(k*c_in*r*s*sizeof(value_type));
 
@@ -361,7 +392,30 @@ Layer::Layer(
         // set output descriptor based on above
         checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
     break;
+  case POOL_AVERAGE:
+        checkCUDNN(cudnnCreateTensorDescriptor(&srcTensorDesc));
+        checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
+        checkCUDNN(cudnnCreatePoolingDescriptor(&poolingDesc));
+        checkCuda(cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type)));
+
+        // set input descriptors
+        checkCUDNN(cudnnSetTensor4dDescriptor(srcTensorDesc, tensorFormat, dataType, n_in, c_in, h_in, w_in));
+        checkCUDNN(cudnnSetPooling2dDescriptor(poolingDesc, CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING, CUDNN_NOT_PROPAGATE_NAN, r, s, pad_h, pad_w, stride_h, stride_w));
+        // find dimension of pooling output
+        checkCUDNN(cudnnGetPooling2dForwardOutputDim(poolingDesc, srcTensorDesc, &n_out, &c_out, &h_out, &w_out));
+        printf("%d %d %d %dasdfasdfasd\n", n_out, c_out, h_out, w_out);
+
+        // set output descriptor based on above
+        checkCUDNN(cudnnSetTensor4dDescriptor(dstTensorDesc, tensorFormat, dataType, n_out, c_out, h_out, w_out));
+      break;
+    case RESIDUAL:
+        checkCUDNN(cudnnCreateTensorDescriptor(&srcTensorDesc));
+        checkCUDNN(cudnnCreateTensorDescriptor(&dstTensorDesc));
+        checkCuda(cudaMalloc(&srcData, n_in*c_in*h_in*w_in*sizeof(value_type)));
+
+      break;
   default:
+    printf("layer %d\n", _layerType);
     assert(0);
     break;
   }
@@ -371,146 +425,264 @@ Layer::Layer(
   checkCUDNN(cudnnCreateTensorDescriptor(&dstDiffTensorDesc));
 }
 
-struct Model_layer createModel(int type, cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem){
+struct Model_layer create_Resnet(cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem){
     struct Model_layer model;
-    printf("type : %d\n", type);
+    model.list_layer[0] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 3, 224, 224,
+        3, 3, 2, 2,
+        64, 7, 7,
+        MAX_BATCH_SIZE, 64, 112, 112,
+        1, 20, 2000);
+
+    model.list_layer[1] = new Layer(POOL, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 64, 112, 112,
+        0, 0, 2, 2,
+        64, 3, 3,
+        MAX_BATCH_SIZE, 64, 56, 56,
+        1, 20, 2000);
+    model.list_layer[0]->setDstData(model.list_layer[1]->SrcData());
+
+    /* loop */
     
-    if(type == 1){
-        model.list_layer[0] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-            MAX_BATCH_SIZE, 3, 224, 224,
-            3, 3, 2, 2,
-            64, 7, 7,
-            MAX_BATCH_SIZE, 64, 112, 112,
-            1, 20, 2000);
+    model.list_layer[2] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 64, 56, 56,
+        0, 0, 1, 1,
+        64, 1, 1,
+        MAX_BATCH_SIZE, 64, 56, 56,
+        1, 20, 2000);
 
-        model.list_layer[1] = new Layer(POOL, &cudnnHandle, &myStream_compute, &myStream_mem,
-            MAX_BATCH_SIZE, 64, 112, 112,
-            0, 0, 2, 2,
-            64, 3, 3,
-            MAX_BATCH_SIZE, 64, 56, 56,
-            1, 20, 2000);
-        model.list_layer[0]->setDstData(model.list_layer[1]->SrcData());
+    model.list_layer[1]->setDstData(model.list_layer[2]->SrcData());
 
-        /* loop */
-        
-        model.list_layer[2] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-            MAX_BATCH_SIZE, 64, 56, 56,
+    model.list_layer[3] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 64, 56, 56,
+        1, 1, 1, 1,
+        64, 3, 3,
+        MAX_BATCH_SIZE, 64, 56, 56,
+        1, 20, 2000);
+
+    model.list_layer[2]->setDstData(model.list_layer[3]->SrcData());
+
+    model.list_layer[4] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 64, 56, 56,
+        0, 0, 1, 1,
+        256, 1, 1,
+        MAX_BATCH_SIZE, 256, 56, 56,
+        1, 20, 2000);
+
+    model.list_layer[3]->setDstData(model.list_layer[4]->SrcData());
+
+    for(int k=1; k<3; k++){
+
+        model.list_layer[3*k+2] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 256, 56, 56,
             0, 0, 1, 1,
             64, 1, 1,
             MAX_BATCH_SIZE, 64, 56, 56,
             1, 20, 2000);
 
-        model.list_layer[1]->setDstData(model.list_layer[2]->SrcData());
+        model.list_layer[3*k+1]->setDstData(model.list_layer[3*k+2]->SrcData());
 
-        model.list_layer[3] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        model.list_layer[3*k+3] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
             MAX_BATCH_SIZE, 64, 56, 56,
             1, 1, 1, 1,
             64, 3, 3,
             MAX_BATCH_SIZE, 64, 56, 56,
             1, 20, 2000);
 
-        model.list_layer[2]->setDstData(model.list_layer[3]->SrcData());
+        model.list_layer[3*k+2]->setDstData(model.list_layer[3*k+3]->SrcData());
 
-        model.list_layer[4] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        model.list_layer[3*k+4] = new Layer(CONV_RESIDUAL, &cudnnHandle, &myStream_compute, &myStream_mem,
             MAX_BATCH_SIZE, 64, 56, 56,
             0, 0, 1, 1,
             256, 1, 1,
             MAX_BATCH_SIZE, 256, 56, 56,
             1, 20, 2000);
 
-        model.list_layer[3]->setDstData(model.list_layer[4]->SrcData());
+        model.list_layer[3*k+3]->setDstData(model.list_layer[3*k+4]->SrcData());
+    }
 
-        for(int k=0; k<2; k++){
-            model.list_layer[3*k+5] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-                MAX_BATCH_SIZE, 256, 56, 56,
-                0, 0, 1, 1,
-                64, 1, 1,
-                MAX_BATCH_SIZE, 64, 56, 56,
-                1, 20, 2000);
-    
-            model.list_layer[3*k+4]->setDstData(model.list_layer[3*k+5]->SrcData());
-    
-            model.list_layer[3*k+6] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-                MAX_BATCH_SIZE, 64, 56, 56,
-                1, 1, 1, 1,
-                64, 3, 3,
-                MAX_BATCH_SIZE, 64, 56, 56,
-                1, 20, 2000);
-    
-            model.list_layer[3*k+5]->setDstData(model.list_layer[3*k+6]->SrcData());
-    
-            model.list_layer[3*k+7] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-                MAX_BATCH_SIZE, 64, 56, 56,
-                0, 0, 1, 1,
-                256, 1, 1,
-                MAX_BATCH_SIZE, 256, 56, 56,
-                1, 20, 2000);
-    
-            model.list_layer[3*k+6]->setDstData(model.list_layer[3*k+7]->SrcData());
-        }
+    /* second loop 1 */
 
-        /* second loop 1 */
+    model.list_layer[11] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 256, 56, 56,
+        0, 0, 2, 2,
+        128, 1, 1,
+        MAX_BATCH_SIZE, 128, 28, 28,
+        1, 20, 2000);
+    model.list_layer[10]->setDstData(model.list_layer[11]->SrcData());
 
-        model.list_layer[11] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-            MAX_BATCH_SIZE, 256, 56, 56,
-            0, 0, 2, 2,
+    model.list_layer[12] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 128, 28, 28,
+        1, 1, 1, 1,
+        128, 3, 3,
+        MAX_BATCH_SIZE, 128, 28, 28,
+        1, 20, 2000);
+    model.list_layer[11]->setDstData(model.list_layer[12]->SrcData());
+
+    model.list_layer[13] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 128, 28, 28,
+        0, 0, 1, 1,
+        512, 1, 1,
+        MAX_BATCH_SIZE, 512, 28, 28,
+        1, 20, 2000);        
+    model.list_layer[12]->setDstData(model.list_layer[13]->SrcData());
+
+    for(int k=1; k<4; k++){
+        model.list_layer[3*k+11] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 512, 28, 28,
+            0, 0, 1, 1,
             128, 1, 1,
             MAX_BATCH_SIZE, 128, 28, 28,
             1, 20, 2000);
-        model.list_layer[10]->setDstData(model.list_layer[11]->SrcData());
+        model.list_layer[3*k+10]->setDstData(model.list_layer[3*k+11]->SrcData());
 
-        model.list_layer[12] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        model.list_layer[3*k+12] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
             MAX_BATCH_SIZE, 128, 28, 28,
             1, 1, 1, 1,
             128, 3, 3,
             MAX_BATCH_SIZE, 128, 28, 28,
             1, 20, 2000);
-        model.list_layer[11]->setDstData(model.list_layer[12]->SrcData());
+        model.list_layer[3*k+11]->setDstData(model.list_layer[3*k+12]->SrcData());
 
-        model.list_layer[13] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        model.list_layer[3*k+13] = new Layer(CONV_RESIDUAL, &cudnnHandle, &myStream_compute, &myStream_mem,
             MAX_BATCH_SIZE, 128, 28, 28,
             0, 0, 1, 1,
             512, 1, 1,
             MAX_BATCH_SIZE, 512, 28, 28,
             1, 20, 2000);        
-        model.list_layer[12]->setDstData(model.list_layer[13]->SrcData());
+        model.list_layer[3*k+12]->setDstData(model.list_layer[3*k+13]->SrcData());
+    }
 
-        for(int k=0; k<4; k++){
-            model.list_layer[3*k+13] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-                MAX_BATCH_SIZE, 256, 56, 56,
-                0, 0, 2, 2,
-                128, 1, 1,
-                MAX_BATCH_SIZE, 128, 28, 28,
-                1, 20, 2000);
-            model.list_layer[3*k+12]->setDstData(model.list_layer[3*k+13]->SrcData());
-    
-            model.list_layer[3*k+14] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-                MAX_BATCH_SIZE, 128, 28, 28,
-                1, 1, 1, 1,
-                128, 3, 3,
-                MAX_BATCH_SIZE, 128, 28, 28,
-                1, 20, 2000);
-            model.list_layer[3*k+13]->setDstData(model.list_layer[3*k+14]->SrcData());
-    
-            model.list_layer[3*k+15] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
-                MAX_BATCH_SIZE, 128, 28, 28,
-                0, 0, 1, 1,
-                512, 1, 1,
-                MAX_BATCH_SIZE, 512, 28, 28,
-                1, 20, 2000);        
-            model.list_layer[3*k+14]->setDstData(model.list_layer[3*k+15]->SrcData());
-        }
+    /* third loop */
+    model.list_layer[23] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 512, 28, 28,
+        0, 0, 2, 2,
+        256, 1, 1,
+        MAX_BATCH_SIZE, 256, 14, 14,
+        1, 20, 2000);        
+    model.list_layer[22]->setDstData(model.list_layer[23]->SrcData());
 
-        model.list_layer[25] = new Layer(CONV_LAST, &cudnnHandle, &myStream_compute, &myStream_mem,
-            MAX_BATCH_SIZE, 512, 28, 28,
+    model.list_layer[24] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 256, 14, 14,
+        1, 1, 1, 1,
+        256, 3, 3,
+        MAX_BATCH_SIZE, 256, 14, 14,
+        1, 20, 2000);        
+    model.list_layer[23]->setDstData(model.list_layer[24]->SrcData());
+
+    model.list_layer[25] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 256, 14, 14,
+        0, 0, 1, 1,
+        1024, 1, 1,
+        MAX_BATCH_SIZE, 1024, 14, 14,
+        1, 20, 2000);        
+    model.list_layer[24]->setDstData(model.list_layer[25]->SrcData());
+
+    for(int k=1; k<6; k++){
+        model.list_layer[3*k+23] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 1024, 14, 14,
+            0, 0, 1, 1,
+            256, 1, 1,
+            MAX_BATCH_SIZE, 256, 14, 14,
+            1, 20, 2000);        
+        model.list_layer[3*k+22]->setDstData(model.list_layer[3*k+23]->SrcData());
+    
+        model.list_layer[3*k+24] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 256, 14, 14,
+            1, 1, 1, 1,
+            256, 3, 3,
+            MAX_BATCH_SIZE, 256, 14, 14,
+            1, 20, 2000);        
+        model.list_layer[3*k+23]->setDstData(model.list_layer[3*k+24]->SrcData());
+    
+        model.list_layer[3*k+25] = new Layer(CONV_RESIDUAL, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 256, 14, 14,
+            0, 0, 1, 1,
+            1024, 1, 1,
+            MAX_BATCH_SIZE, 1024, 14, 14,
+            1, 20, 2000);        
+        model.list_layer[3*k+24]->setDstData(model.list_layer[3*k+25]->SrcData());
+    }
+
+    /* fourth loop */
+    model.list_layer[41] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 1024, 14, 14,
+        0, 0, 2, 2,
+        512, 1, 1,
+        MAX_BATCH_SIZE, 512, 7, 7,
+        1, 20, 2000);        
+    model.list_layer[40]->setDstData(model.list_layer[41]->SrcData());
+
+    model.list_layer[42] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 512, 7, 7,
+        1, 1, 1, 1,
+        512, 3, 3,
+        MAX_BATCH_SIZE, 512, 7, 7,
+        1, 20, 2000);        
+    model.list_layer[41]->setDstData(model.list_layer[42]->SrcData());
+
+    model.list_layer[43] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 512, 7, 7,
+        0, 0, 1, 1,
+        2048, 1, 1,
+        MAX_BATCH_SIZE, 2048, 7, 7,
+        1, 20, 2000);        
+    model.list_layer[42]->setDstData(model.list_layer[43]->SrcData());
+
+    for(int k=1; k<3; k++){
+        model.list_layer[3*k+41] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 2048, 7, 7,
             0, 0, 1, 1,
             512, 1, 1,
-            MAX_BATCH_SIZE, 512, 28, 28,
+            MAX_BATCH_SIZE, 512, 7, 7,
             1, 20, 2000);        
-        model.list_layer[24]->setDstData(model.list_layer[25]->SrcData());
+        model.list_layer[3*k+40]->setDstData(model.list_layer[3*k+41]->SrcData());
+    
+        model.list_layer[3*k+42] = new Layer(CONV, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 512, 7, 7,
+            1, 1, 1, 1,
+            512, 3, 3,
+            MAX_BATCH_SIZE, 512, 7, 7,
+            1, 20, 2000);        
+        model.list_layer[3*k+41]->setDstData(model.list_layer[3*k+42]->SrcData());
+    
+        model.list_layer[3*k+43] = new Layer(CONV_RESIDUAL, &cudnnHandle, &myStream_compute, &myStream_mem,
+            MAX_BATCH_SIZE, 512, 7, 7,
+            0, 0, 1, 1,
+            2048, 1, 1,
+            MAX_BATCH_SIZE, 2048, 7, 7,
+            1, 20, 2000);        
+        model.list_layer[3*k+42]->setDstData(model.list_layer[3*k+43]->SrcData());
+    }
 
+    model.list_layer[50] = new Layer(POOL_AVERAGE, &cudnnHandle, &myStream_compute, &myStream_mem, 
+        MAX_BATCH_SIZE, 2048, 7, 7,
+        0, 0, 1, 1,
+        2048, 7, 7,
+        MAX_BATCH_SIZE, 2048, 1, 1,
+        1, 20, 2000);
+    model.list_layer[49]->setDstData(model.list_layer[50]->SrcData());
+
+    model.list_layer[51] = new Layer(CONV_LAST, &cudnnHandle, &myStream_compute, &myStream_mem,
+        MAX_BATCH_SIZE, 2048, 1, 1,
+        0, 0, 1, 1,
+        1, 1, 1,
+        MAX_BATCH_SIZE, 2048, 1, 1,
+        1, 20, 2000);
+    model.list_layer[50]->setDstData(model.list_layer[51]->SrcData());
+
+    return model;
+}
+
+struct Model_layer createModel(int type, cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem){
+    struct Model_layer model;
+    printf("type : %d\n", type);
+    
+    if(type == 1){
+        model = create_Resnet(cudnnHandle, myStream_compute, myStream_mem);
     }
     else{
+        
         for(int i=0; i<MAX_LAYER_NUM; i++){
             model.list_layer[i] = new Layer(model_info[i], &cudnnHandle, &myStream_compute, &myStream_mem,
                 MAX_BATCH_SIZE, 64, 224, 224, 1, 1, 1, 1, 64, 3, 3,
@@ -670,6 +842,16 @@ int main(int argc, char **argv)
                                                 current_index_layer->dstTensorDesc,
                                                 current_index_layer->dstData));
 
+                if(current_index_layer->layerType == CONV_RESIDUAL){
+                    checkCUDNN(cudnnAddTensor(  *cudnnHandle, 
+                        &alpha, 
+                        biasTensorDesc,
+                        biasData,
+                        &alpha,
+                        dstTensorDesc,
+                        dstData
+                      ));
+                }
 
                 printf("Passed index no%d at time %lf\n", v_now.idx_layer, now);
                 v_now.idx_layer += 1;
@@ -690,7 +872,7 @@ int main(int argc, char **argv)
                     if(sizeInBytes !=0) cudaFree(workSpace);
                 }
             }
-            else if(current_index_layer->layerType == POOL){
+            else if(current_index_layer->layerType == POOL || current_index_layer->layerType == POOL_AVERAGE){
 
                 std::cout<<"[Note] Pooling Layer"<<std::endl;
                 

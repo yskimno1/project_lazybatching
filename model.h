@@ -28,4 +28,4 @@ struct Model_layer{
     bool data_exist;
 };
 
-struct Model_layer createModel(cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem);
+struct Model_layer createModel(int type, cudnnHandle_t cudnnHandle, cudaStream_t myStream_compute, cudaStream_t myStream_mem);
