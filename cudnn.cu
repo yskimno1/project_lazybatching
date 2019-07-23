@@ -742,10 +742,6 @@ bool merge_request(vector<struct vector_layer>* v_layer){
 int main(int argc, char **argv)
 {
 
-    double input_time[] = {1, 1.01, 1.011, 1.02, 1.022, 1.025, 1.5};
-    int input_unroll[] = {7, 12, 15, 6, 7, 8};
-    int current_unroll[] = {0, 0, 0, 0, 0, 0};
-
     ifstream in(argv[1]);
     string s;
     char buf[100];
@@ -754,6 +750,9 @@ int main(int argc, char **argv)
     vector<int> request_unroll;
     vector<int> request_current_unroll;
     int request_number;
+
+    /* for data */
+    vector<double> request_latency;
 
     if(in.is_open()){
         while(in){
@@ -767,6 +766,7 @@ int main(int argc, char **argv)
         for(int i=0; i<request_number; i++){
             request_unroll.push_back(5);
             request_current_unroll.push_back(0);
+            request_latency.push_back(-request_vector.at(i));
         }
 
     }
@@ -802,36 +802,40 @@ int main(int argc, char **argv)
     value_type beta  = value_type(0);
  
     start = clock();
-    int num_input = sizeof(input_time)/sizeof(input_time[0]);
+
     /* --------------------------------------------------------------- */
     /* --------------------------------------------------------------- */
     /* --------------------------------------------------------------- */
     bool stall = false;
-    while(input_index <= num_input){
+    while(input_index <= request_number){
         
-        double now = get_current_time(start);
+        double input_time = get_current_time(start);
         stall = false;
-        if(model.data_num >= MAX_BATCH_SIZE) stall = true;
+        if(model.data_num >= MAX_REQ_SIZE)    stall = true;
         
-
         /* New input condition */
-        if(stall==false && input_index != num_input && now > input_time[input_index]){ 
+        if(stall==false && input_index != request_number && input_time > request_vector.at(input_index)){ 
             
-            struct vector_layer v_new = set_vector(0, input_index, input_unroll[input_index]);
+            struct vector_layer v_new = set_vector(0, input_index, request_unroll.at(input_index) );
             
             v_layer.push_back(v_new);
+            // if(request_latency.at(input_index) > -0.5) {
+            //     request_latency.at(input_index) -= input_time;
+            //     printf("1. latency input : %lf %d\n", input_time, input_index);
+            // }
+
             input_index += 1;
-            printf("--came at time : %lf--\n", now);
+            printf("--came at time : %lf--\n", input_time);
             printf("--input index : %d\n", input_index);
-           
+        
             model.data_num += 1;
 
             if(merge_request(&v_layer)){
                 printf("merged!\n");
             }
         }
-
         else{
+
             if(v_layer.size() <= 0) continue;
             
             void* workSpace=NULL;
@@ -881,17 +885,26 @@ int main(int argc, char **argv)
                         current_index_layer->dstData
                       ));
                 }
-
+                double now = get_current_time(start);
                 printf("Passed index %d at time %lf\n\n", v_now.idx_layer, now);
                 v_now.idx_layer += 1;
-                
+
                 if(v_now.idx_layer >= MAX_LAYER_NUM){
                     int request_done = v_now.idx_request.size();
                     model.data_first += request_done;
                     model.data_num -= request_done;
 
+                    vector<int>::iterator iter=v_now.idx_request.begin();
+                
+                    for(; iter!=v_now.idx_request.end(); iter++){
+                        // printf("before latency at request no.%d : %lf\n", *iter, request_latency.at(*iter));
+                        request_latency.at(*iter) += now;
+                        printf("%lf, latency of request no.%d : %lf\n\n", now, *iter, request_latency.at(*iter));
+                    }
+
+
                     if(sizeInBytes !=0) cudaFree(workSpace);
-                    if(input_index == num_input) break;
+                    if(input_index == request_number) break;
                 }
                 else{
                     v_layer.push_back(v_now);
@@ -910,7 +923,7 @@ int main(int argc, char **argv)
                     &beta,
                     current_index_layer->dstTensorDesc,
                     current_index_layer->dstData));
-
+                double now = get_current_time(start);
                 printf("Passed index %d at time %lf\n\n", v_now.idx_layer, now);
                 v_now.idx_layer += 1;
                 
@@ -919,7 +932,7 @@ int main(int argc, char **argv)
                     model.data_first += request_done;
                     model.data_num -= request_done;
 
-                    if(input_index == num_input) break;
+                    if(input_index == request_number) break;
                 }
                 else{
                     v_layer.push_back(v_now);
@@ -964,6 +977,7 @@ int main(int argc, char **argv)
                                                     current_index_layer->cy,
                                                     workSpace,
                                                     sizeInBytes));
+                double now = get_current_time(start);
                 printf("Passed index %d at time %lf\n\n", v_now.idx_layer, now);
                 if(sizeInBytes !=0) cudaFree(workSpace);
                 
@@ -971,8 +985,8 @@ int main(int argc, char **argv)
                 
                 bool req_passed = false;
                 for(; iter!=v_now.idx_request.end(); iter++){
-                    if(current_unroll[*iter] < input_unroll[*iter]-1){
-                        current_unroll[*iter] += 1;
+                    if(request_current_unroll.at(*iter) < request_unroll.at(*iter) -1){
+                        request_current_unroll.at(*iter) += 1;
                         req_passed = true;
                     }
                 }
@@ -986,7 +1000,7 @@ int main(int argc, char **argv)
                         model.data_first += request_done;
                         model.data_num -= request_done;
 
-                        if(input_index == num_input) break;
+                        if(input_index == request_number) break;
                     }
                     else{
                         v_layer.push_back(v_now);

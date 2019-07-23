@@ -12,11 +12,11 @@ args = parser.parse_args()
 f = open('requests.txt', 'w')
 for i in range(args.number):
   req = 1 + args.interval * i
+  req = round(req, 4);
   if(i == args.number-1):
       data = str(req)
   else:
       data = str(req) + ","
   f.write(data)
-
-
+  
 f.close()
