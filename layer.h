@@ -26,7 +26,7 @@
 
 #define value_type float
 #define DATA_PRECISION CUDNN_DATA_FLOAT
-#define MAX_BATCH_SIZE 16
+#define MAX_BATCH_SIZE 1
 #define MAX_REQ_SIZE 1
 #define MODEL_TYPE 1
 #define MAX_LAYER_NUM 52
