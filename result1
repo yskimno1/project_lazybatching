@@ -1,0 +1,184 @@
+----------------
+
+build done
+
+----------------
+
+----------------
+
+test done
+
+----------------
+
+anybatch_0.05ms last :  3064.562000ms, latency of request no.999 : 2014.612049ms
+
+anybatch_0.1ms last :  3252.980000ms, latency of request no.999 : 2153.079976ms
+
+anybatch_0.25ms last :  3486.022000ms, latency of request no.999 : 2236.272000ms
+
+anybatch_0.5ms last :  3302.150000ms, latency of request no.999 : 1802.650000ms
+
+anybatch_1ms last :  3127.081000ms, latency of request no.999 : 1128.081000ms
+
+anybatch_1.1ms last :  3522.720000ms, latency of request no.999 : 1423.820098ms
+
+anybatch_1.2ms last :  3528.682000ms, latency of request no.999 : 1329.881951ms
+
+anybatch_1.3ms last :  3532.856000ms, latency of request no.999 : 1234.156049ms
+
+anybatch_1.4ms last :  3542.406000ms, latency of request no.999 : 1143.805902ms
+
+anybatch_1.5ms last :  3545.057000ms, latency of request no.999 : 1046.557000ms
+
+anybatch_1.6ms last :  3555.163000ms, latency of request no.999 : 956.763098ms
+
+anybatch_1.7ms last :  3554.414000ms, latency of request no.999 : 856.113951ms
+
+anybatch_1.8ms last :  3562.753000ms, latency of request no.999 : 764.553049ms
+
+anybatch_1.9ms last :  3498.252000ms, latency of request no.999 : 600.151902ms
+
+anybatch_2ms last :  3312.889000ms, latency of request no.999 : 314.889000ms
+
+anybatch_3ms last :  4031.141000ms, latency of request no.999 : 34.141000ms
+
+anybatch_5ms last :  6000.145000ms, latency of request no.999 : 5.145000ms
+
+anybatch_10ms last :  10991.093000ms, latency of request no.999 : 1.093000ms
+
+anybatch_20ms last :  20981.080000ms, latency of request no.999 : 1.080000ms
+
+anybatch_30ms last :  30971.149000ms, latency of request no.999 : 1.149000ms
+
+anybatch_50ms last :  50951.074000ms, latency of request no.999 : 1.074000ms
+
+dynamic_0.05ms last :  3536.015000ms, latency of request no.999 : 2486.065049ms
+
+dynamic_0.1ms last :  3530.495000ms, latency of request no.999 : 2430.594976ms
+
+dynamic_0.25ms last :  3537.086000ms, latency of request no.999 : 2287.336000ms
+
+dynamic_0.5ms last :  3543.251000ms, latency of request no.999 : 2043.751000ms
+
+dynamic_1ms last :  3548.940000ms, latency of request no.999 : 1549.940000ms
+
+dynamic_1.1ms last :  3550.688000ms, latency of request no.999 : 1451.788098ms
+
+dynamic_1.2ms last :  3527.260000ms, latency of request no.999 : 1328.459951ms
+
+dynamic_1.3ms last :  3554.008000ms, latency of request no.999 : 1255.308049ms
+
+dynamic_1.4ms last :  3531.946000ms, latency of request no.999 : 1133.345902ms
+
+dynamic_1.5ms last :  3557.859000ms, latency of request no.999 : 1059.359000ms
+
+dynamic_1.6ms last :  3567.277000ms, latency of request no.999 : 968.877098ms
+
+dynamic_1.7ms last :  3556.734000ms, latency of request no.999 : 858.433951ms
+
+dynamic_1.8ms last :  3572.466000ms, latency of request no.999 : 774.266049ms
+
+dynamic_1.9ms last :  3574.989000ms, latency of request no.999 : 676.888902ms
+
+dynamic_2ms last :  3575.616000ms, latency of request no.999 : 577.616000ms
+
+dynamic_3ms last :  4076.911000ms, latency of request no.999 : 79.911000ms
+
+dynamic_5ms last :  6060.941000ms, latency of request no.999 : 65.941000ms
+
+dynamic_10ms last :  11060.926000ms, latency of request no.999 : 70.926000ms
+
+dynamic_20ms last :  21000.936000ms, latency of request no.999 : 20.936000ms
+
+dynamic_30ms last :  30980.882000ms, latency of request no.999 : 10.882000ms
+
+dynamic_50ms last :  51051.822000ms, latency of request no.999 : 101.822000ms
+
+----------------
+
+throughput done
+
+----------------
+
+interval 0.05
+latency :  996.1204239999992
+interval 0.1
+latency :  991.7849919999999
+interval 0.25
+latency :  968.0521520000017
+interval 0.5
+latency :  800.8709439999984
+interval 1
+latency :  530.6215760000008
+interval 1.1
+latency :  598.4177751219995
+interval 1.2
+latency :  552.7169980000002
+interval 1.3
+latency :  508.80427506100006
+interval 1.4
+latency :  470.37767893899974
+interval 1.5
+latency :  425.80646900000033
+interval 1.6
+latency :  384.3721400000002
+interval 1.7
+latency :  335.88120600000025
+interval 1.8
+latency :  296.61104818300004
+interval 1.9
+latency :  257.34427593899983
+interval 2
+latency :  207.15187800000086
+interval 3
+latency :  38.98308800000023
+interval 5
+latency :  52.79174000000013
+interval 10
+latency :  1.1061730000000007
+interval 20
+latency :  1.1122439999999991
+interval 30
+latency :  1.1405100000000017
+interval 50
+latency :  1.087671
+interval 0.25
+latency :  953.6211279999989
+interval 0.5
+latency :  836.4677519999981
+interval 1
+latency :  600.6431039999981
+interval 1.1
+latency :  554.5257441220001
+interval 1.2
+latency :  488.575664
+interval 1.3
+latency :  462.7220640610002
+interval 1.4
+latency :  399.3070079389998
+interval 1.5
+latency :  371.8262159999998
+interval 1.6
+latency :  330.09268000000003
+interval 1.7
+latency :  278.17616000000004
+interval 1.8
+latency :  244.67505618300007
+interval 1.9
+latency :  202.92845593899983
+interval 2
+latency :  162.16615999999988
+interval 3
+latency :  23.96020000000004
+interval 5
+latency :  38.81714400000015
+interval 10
+latency :  52.04979599999992
+interval 10
+latency :  52.04979599999992
+interval 20
+latency :  52.41900099999999
+interval 30
+latency :  55.90652800000016
+interval 50
+latency :  57.58842599999986

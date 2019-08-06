@@ -11,6 +11,8 @@ while True:
     latency = line.split(':')[1]
     latency = latency.split('\n')[0]
     latency = latency.split(' ')[1]
+
+    latency = latency.split('m')[0]
     # print(latency)
     sum += float(latency)
 

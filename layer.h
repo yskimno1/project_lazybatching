@@ -26,10 +26,18 @@
 
 #define value_type float
 #define DATA_PRECISION CUDNN_DATA_FLOAT
+
+#define MODE_DYNAMIC 0
+#define DYNAMIC_TERM 100
+
+#define MODEL_TYPE 2
+#define MAX_LAYER_NUM 4
+
 #define MAX_BATCH_SIZE 1
 #define MAX_REQ_SIZE 1
-#define MODEL_TYPE 1
-#define MAX_LAYER_NUM 52
+
+
+// #define MAX_LAYER_NUM 52
 
 enum layer_t
 {
@@ -39,10 +47,11 @@ enum layer_t
     RELU            = 3,
     FC              = 4,
     RNN             = 5,
-    POOL_AVERAGE    = 6,
-    POOL            = 7,
-    CONV_RESIDUAL   = 8,
-    NUM_LAYER_TYPES = 9
+    RNN_LAST        = 6,
+    POOL_AVERAGE    = 7,
+    POOL            = 8,
+    CONV_RESIDUAL   = 9,
+    NUM_LAYER_TYPES = 10
 };
 
 enum model_t
@@ -152,6 +161,8 @@ public:
     void *cy;
 
     void* weight;
+    void* workSpace;
+    size_t sizeInBytes;
 
     // streams
     cudaStream_t*                 stream_compute;
