@@ -31,11 +31,14 @@
 #define DYNAMIC_TERM 100
 
 #define MODEL_TYPE 2
-#define MAX_LAYER_NUM 4
+#define MAX_LAYER_NUM 9
 
-#define MAX_BATCH_SIZE 1
-#define MAX_REQ_SIZE 1
+#define MAX_BATCH_SIZE 16
+#define MAX_REQ_SIZE 16
 
+#define HIDDEN_SIZE_GNMT 1024
+
+#define DEC_SEQ_LENGTH 1024
 
 // #define MAX_LAYER_NUM 52
 
@@ -51,7 +54,12 @@ enum layer_t
     POOL_AVERAGE    = 7,
     POOL            = 8,
     CONV_RESIDUAL   = 9,
-    NUM_LAYER_TYPES = 10
+    SOFTMAX         = 10,
+    ACTIVATE        = 11,
+
+    ATTENTION       = 12,
+    RNN_DECODER     = 13,
+    NUM_LAYER_TYPES = 14
 };
 
 enum model_t
@@ -65,14 +73,15 @@ class Layer{
 public:
     Layer(
         enum layer_t         _layerType,
+        cublasHandle_t* _cublasHandle,
         cudnnHandle_t*  _cudnnHandle,
         cudaStream_t*   _stream_compute,
         cudaStream_t*   _stream_memory,
         int _n, int _c, int _h, int _w,
         int _pad_h, int _pad_w, int _stride_h, int _stride_w,
         int _k, int _r, int _s,
-        int _n_out, int _c_out, int _h_out, int _w_out, int _seqlength, int _hidden_size,
-        int _num_layers, int idx);
+        int _n_out, int _c_out, int _h_out, int _w_out,
+        int _seqlength, int _hidden_size, int _num_layers, int idx);
 
     ~Layer(){};
 
@@ -98,7 +107,7 @@ public:
     int           FilterDataSize()  { return k*c_in*r*s;          }
 
     void          setDstData(void* point)     { this->dstData = point; }
-
+    void          setContextData(void* point)   { this->contextData = point;}
     // mem usage
     size_t        memUsageSrcData();
     size_t        memUsageDstData();
@@ -116,6 +125,7 @@ public:
     void          decrementRefCntFwd()  { assert(refCntFwd>0);  refCntFwd--;  }
     void          decrementRefCntBwd()  { assert(refCntBwd>0);  refCntBwd--;  }
 
+    void          change_size_RNN(int initialized, int size);
     // private:
     enum layer_t   layerType;
     int       id;
@@ -179,6 +189,10 @@ public:
     void*     dstData;
     void*     diffData;
     void*     gradData;
+    void*     gemmData;
+    void*     weightData;
+    void*     softmaxData;
+    void*     contextData;
 
     // for backprop
     //value_type*   diffData; // backprop input to layer
@@ -187,11 +201,12 @@ public:
     //--------
     // cuDNN 
     //--------
+
     cudnnHandle_t*                cudnnHandle;  // shared across all layers
     cudnnDataType_t               dataType;
     cudnnConvolutionMode_t        modeConv;
     cudnnTensorFormat_t           tensorFormat;
-    cudnnTensorDescriptor_t       srcTensorDesc, dstTensorDesc, biasTensorDesc;
+    cudnnTensorDescriptor_t       srcTensorDesc, dstTensorDesc, biasTensorDesc, gemmTensorDesc, weightTensorDesc, softmaxTensorDesc, contextTensorDesc;
     cudnnTensorDescriptor_t       *xDesc;
     cudnnTensorDescriptor_t       *yDesc;
     cudnnTensorDescriptor_t       hxDesc, cxDesc, hyDesc, cyDesc;
@@ -210,6 +225,11 @@ public:
     cudnnRNNMode_t                modeRNN;
     cudnnDirectionMode_t          direction;
     cudnnRNNAlgo_t                rnnAlgo;
+
+    cudnnSoftmaxAlgorithm_t       softmaxAlgo;
+    cudnnSoftmaxMode_t            softmaxMode;
+    cudnnActivationDescriptor_t   activationDesc;
+    
     int rnnalgo_int;
 
     size_t weightsSize;
