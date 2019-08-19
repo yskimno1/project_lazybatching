@@ -75,10 +75,10 @@ struct vector_layer{
     int seqlength;
 };
 
-struct vector_layer set_vector(int idx_layer, int input_index, int seqlength){
+struct vector_layer set_vector(int idx_layer, int index_request, int seqlength){
     struct vector_layer new_vector;
     new_vector.idx_layer = idx_layer;
-    new_vector.idx_request.push_back(input_index);
+    new_vector.idx_request.push_back(index_request);
     new_vector.seqlength = seqlength;
     return new_vector;
 }
@@ -103,52 +103,40 @@ bool merge_request(vector<struct vector_layer>* v_layer){
 
 int main(int argc, char **argv)
 {
-
-    ifstream in(argv[1]);
-    string s;
+    vector<float> vector_request;
+    vector<double> latency_request;
+    vector<int> unroll_request;
+    vector<int> current_unroll_request;
+    int total_request_num;
+    int fixed_seq_length = 5;
+    
+    ifstream filename(argv[1]);
     char buf[100];
-
-    vector<float> request_vector;
-    vector<int> request_unroll;
-    vector<int> request_current_unroll;
-    int request_number;
-
-    /* for data */
-    vector<double> request_latency;
-
-    if(in.is_open()){
-        while(in){
-            in.getline(buf, 100, ',');
-            if(strlen(buf)) request_vector.push_back(atof(buf));
+    if(filename.is_open()){
+        while(filename){
+            filename.getline(buf, 100, ',');
+            if(strlen(buf)) vector_request.push_back(atof(buf));
         }
-
-        request_number = request_vector.size();
-        printf("request num : %d\n", request_number);
-
-        for(int i=0; i<request_number; i++){
-            request_unroll.push_back(50);
-            request_current_unroll.push_back(0);
-            request_latency.push_back(-request_vector.at(i));
+        total_request_num = vector_request.size();
+        std::cout<<"Number of requests: "<<total_request_num<<std::endl;
+        for(int i=0; i<total_request_num; i++){
+            unroll_request.push_back(fixed_seq_length);
+            current_unroll_request.push_back(0);
+            latency_request.push_back(-vector_request.at(i));
         }
-
     }
     else exit(-1);
 
     /* ---------------------------- setup ---------------------------- */
-    clock_t start;
 
-    int input_index = 0;
-
-    // create streams
     cudaStream_t myStream_compute;
     cudaStreamCreate(&myStream_compute);
-
     cudaStream_t myStream_mem;
     cudaStreamCreate(&myStream_mem);
-	// cudnn handle
-    cudnnHandle_t         cudnnHandle;  
-    cublasHandle_t        cublasHandle;
 
+	// cudnn handle
+    cudnnHandle_t         cudnnHandle;
+    cublasHandle_t        cublasHandle;
     checkCUDNN(cudnnCreate(&cudnnHandle));
     checkCUBLAS(cublasCreate(&cublasHandle));
 
@@ -157,210 +145,282 @@ int main(int argc, char **argv)
     checkCUDNN(cudnnSetStream(cudnnHandle, myStream_mem));
 
     vector<struct vector_layer> v_layer;
-    struct Model_layer model = createModel(MODEL_TYPE, cudnnHandle, myStream_compute, myStream_mem);
     value_type alpha = value_type(1);
     value_type beta  = value_type(0);
 
-    
+    struct Model_layer model = createModel(MODEL_TYPE, cublasHandle, cudnnHandle, myStream_compute, myStream_mem);
+
+    clock_t start;
     start = clock();
 
-    /* --------------------------------------------------------------- */
-    /* --------------------------------------------------------------- */
-    /* --------------------------------------------------------------- */
+    int index_request = 0;
     bool passing_start = false;
     double waiting_time = get_current_time(start);
     waiting_time = waiting_time + DYNAMIC_TERM;
 
-    // bool first = true;
-    while(input_index <= request_number){
-        
-        double input_time = get_current_time(start);
+    while(index_request <= total_request_num){
+        double time_request_started = get_current_time(start);
 
         passing_start = false;
-        if(model.data_num == MAX_REQ_SIZE || input_time > waiting_time){
-            if(model.data_num != MAX_REQ_SIZE) printf("!! current time : %lf, %lf\n", input_time, waiting_time);
-            if(input_index != 0) passing_start = true;
+        if(model.data_num == MAX_REQ_SIZE || time_request_started > waiting_time){
+            if(model.data_num != MAX_REQ_SIZE) printf("!! current time : %lf, %lf\n", time_request_started, waiting_time);
+            if(index_request != 0) passing_start = true;
 
-            waiting_time = input_time + DYNAMIC_TERM;
+            waiting_time = time_request_started + DYNAMIC_TERM;
         }
 
         /* New input condition */
         if(passing_start==false){
-            if(input_index != request_number && input_time > request_vector.at(input_index)){
+            if(index_request != total_request_num && time_request_started > vector_request.at(index_request)){
             
-                struct vector_layer v_new = set_vector(0, input_index, request_unroll.at(input_index) );
+                struct vector_layer v_new = set_vector(0, index_request, unroll_request.at(index_request) );
                 
                 v_layer.push_back(v_new);
-                if(v_layer.size()==1) waiting_time = input_time + DYNAMIC_TERM;
+                if(v_layer.size()==1) waiting_time = time_request_started + DYNAMIC_TERM;
 
-                input_index += 1;
-                printf("--came at time : %lf--\n", input_time);
-                printf("--input index : %d\n", input_index);
-                printf("--waiting time : %lf\n", waiting_time);
-            
+                index_request += 1;
                 model.data_num += 1;
-                if(merge_request(&v_layer))     printf("merged!\n");
+
+                std::cout<<"                       --came at time : "<<time_request_started<<"--"<<std::endl;
+                std::cout<<"                       --input index : "<<index_request<<"--"<<std::endl;
+                if(merge_request(&v_layer))               std::cout<<"                 merged!\n"<<std::endl;
             }
         }
         else{
             bool sig_end = false;
-            if(input_index == request_number) sig_end = true;
+            if(index_request == total_request_num) sig_end = true;
 
             if(v_layer.size() <= 0) continue;
-            // std::cout<<"current req num: "<<model.data_num<<", starts at "<<model.data_first<<std::endl;
-            printf("size : %d\n", v_layer.size());
+            // printf("size : %d\n", v_layer.size());
             assert(v_layer.size() == 1);
             
-
             int idx_end = v_layer.size()-1;
             struct vector_layer v_now = v_layer[idx_end];
 
-            
             assert(v_now.idx_layer == 0);
             while(v_now.idx_layer != MAX_LAYER_NUM){
                 v_layer.pop_back();
                 Layer* current_index_layer = model.list_layer[v_now.idx_layer];
-                if(current_index_layer->layerType == CONV || current_index_layer->layerType == CONV_LAST || current_index_layer->layerType == CONV_RESIDUAL){
-                    int num_req = v_now.idx_request.size();
-                    printf("num req : %d\n", num_req);
-                    checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->srcTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_in/MAX_BATCH_SIZE*num_req, current_index_layer->c_in, current_index_layer->h_in, current_index_layer->w_in));
-                    checkCUDNN(cudnnGetConvolution2dForwardOutputDim(current_index_layer->convDesc, current_index_layer->srcTensorDesc, current_index_layer->filterDesc, &current_index_layer->n_out, &current_index_layer->c_out, &current_index_layer->h_out, &current_index_layer->w_out));
-                    checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->biasTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
-                    checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->dstTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
+
+
+                if(MODEL_TYPE==2){
+                    switch (current_index_layer->layerType){
+                        case(ATTENTION):
+                            {
+                                std::cout<<"Attention Layer"<<std::endl;
+                                int num_req = v_now.idx_request.size();
+                                
+                                
+                                
+                                /* needs descriptor change */
+            
+            
+            
+                                for(int i=0; i<current_index_layer->n_in/MAX_BATCH_SIZE*num_req; i++){
+                                    checkCUBLAS(cublasSgemm(cublasHandle,  CUBLAS_OP_N, CUBLAS_OP_N,
+                                        current_index_layer->hidden_size, current_index_layer->seqlength, current_index_layer->hidden_size,
+                                        &alpha,
+                                        (float *)(model.matrix_W1), current_index_layer->hidden_size,
+                                        ((float *)current_index_layer->srcData + i * current_index_layer->hidden_size*current_index_layer->seqlength*sizeof(value_type)), current_index_layer->hidden_size,
+                                        &beta,
+                                        ((float *)current_index_layer->gemmData + i * current_index_layer->hidden_size*current_index_layer->seqlength*sizeof(value_type)), current_index_layer->hidden_size
+                                    ));
+                                }
+            
+                                checkCUDNN(cudnnActivationForward(cudnnHandle, current_index_layer->activationDesc, &alpha,
+                                    current_index_layer->gemmTensorDesc,
+                                    current_index_layer->gemmData, 
+                                    &beta,
+                                    current_index_layer->dstTensorDesc,
+                                    current_index_layer->dstData
+                                ));
+            
+                                for(int i=0; i<current_index_layer->n_in/MAX_BATCH_SIZE*num_req; i++){
+                                    checkCUBLAS(cublasSgemv(cublasHandle, CUBLAS_OP_T,
+                                        current_index_layer->hidden_size, current_index_layer->seqlength,
+                                        &alpha,
+                                        ((float *)current_index_layer->dstData + i * current_index_layer->hidden_size*current_index_layer->seqlength*sizeof(value_type)), current_index_layer->hidden_size,
+                                        (float *)model.vector_score, 1,
+                                        &beta,
+                                        ((float *)current_index_layer->weightData + i * 1 * current_index_layer->seqlength*sizeof(value_type)), 1
+                                    ));
+                                }
+            
+                                checkCUDNN(cudnnSoftmaxForward(cudnnHandle, current_index_layer->softmaxAlgo, current_index_layer->softmaxMode,
+                                    &alpha,
+                                    current_index_layer->weightTensorDesc,
+                                    current_index_layer->weightData,
+                                    &beta,
+                                    current_index_layer->softmaxTensorDesc,
+                                    current_index_layer->softmaxData
+                                ));
+            
+                                for(int i=0; i<current_index_layer->n_in/MAX_BATCH_SIZE*num_req; i++){
+                                    checkCUBLAS(cublasSgemv(cublasHandle, CUBLAS_OP_T,
+                                        current_index_layer->hidden_size, current_index_layer->seqlength,
+                                        &alpha,
+                                        ((float *)current_index_layer->srcData + i * current_index_layer->hidden_size*current_index_layer->seqlength*sizeof(value_type)), current_index_layer->hidden_size,
+                                        (float *)current_index_layer->softmaxData + i * 1 * current_index_layer->seqlength*sizeof(value_type), 1,
+                                        &beta,
+                                        ((float *)current_index_layer->contextData + i * 1 * current_index_layer->hidden_size * sizeof(value_type)), 1
+                                    ));
+                                }
+            
+                                double now = get_current_time(start);
+                                std::cout<<"Passed index "<<v_now.idx_layer<<" at time "<<now<<"ms\n"<<std::endl;
+            
+                                checkCuda(cudaMemcpy(model.list_layer[v_now.idx_layer+1]->srcData, model.list_layer[v_now.idx_layer]->contextData,
+                                    current_index_layer->n_in/MAX_BATCH_SIZE*num_req*1*1*current_index_layer->hidden_size*sizeof(value_type), cudaMemcpyDeviceToDevice));
+            
+                                v_now.idx_layer += 1;
+                                if(v_now.idx_layer >= MAX_LAYER_NUM){
+                                    int request_done = v_now.idx_request.size();
+                                    model.data_first += request_done;
+                                    model.data_num -= request_done;
+                
+                                    vector<int>::iterator iter=v_now.idx_request.begin();
+                                
+                                    for(; iter!=v_now.idx_request.end(); iter++){   
+                                        latency_request.at(*iter) += now;
+                                        printf("%lfms, latency of request no.%d : %lfms\n\n", now, *iter, latency_request.at(*iter));
+                                    }
+                                    if(index_request == total_request_num) exit(0);
+                                }
+                                else{
+                                    v_layer.push_back(v_now);
+                                    if(merge_request(&v_layer)){
+                                        printf("merged!\n");
+                                    }
+                                }
+                            }
+                        break;
     
-                    checkCUDNN(cudnnConvolutionForward( cudnnHandle, &alpha, current_index_layer->srcTensorDesc,
-                                                    current_index_layer->srcData,
-                                                    current_index_layer->filterDesc,
-                                                    current_index_layer->filterData,
-                                                    current_index_layer->convDesc,
-                                                    current_index_layer->fwdAlgo,
-                                                    current_index_layer->workSpace,
-                                                    current_index_layer->sizeInBytes,
-                                                    &beta,
-                                                    current_index_layer->dstTensorDesc,
-                                                    current_index_layer->dstData));
-    
-                    if(current_index_layer->layerType == CONV_RESIDUAL){
-                        Layer* bias_layer = model.list_layer[current_index_layer->idx -3];
-                        current_index_layer->biasData = bias_layer->dstData;
-                        
-                        checkCUDNN(cudnnAddTensor( cudnnHandle, 
-                            &alpha, 
-                            current_index_layer->biasTensorDesc,
-                            current_index_layer->biasData,
-                            &beta,
-                            current_index_layer->dstTensorDesc,
-                            current_index_layer->dstData
-                          ));
-                    }
-                    double now = get_current_time(start);
-                    printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
-                    v_now.idx_layer += 1;
-    
-                    if(v_now.idx_layer >= MAX_LAYER_NUM){
-                        int request_done = v_now.idx_request.size();
-                        model.data_first += request_done;
-                        model.data_num -= request_done;
-    
-                        vector<int>::iterator iter=v_now.idx_request.begin();
-                    
-                        for(; iter!=v_now.idx_request.end(); iter++){
-    
-                            request_latency.at(*iter) += now;
-                            printf("%lfms, latency of request no.%d : %lfms\n\n", now, *iter, request_latency.at(*iter));
-                        }
-                    }
-                    else{
-                        v_layer.push_back(v_now);
-                        if(merge_request(&v_layer)){
-                            printf("merged!\n");
-                        }
+                        case(RNN):
+                        case(RNN_LAST):
+                        case(RNN_DECODER):
+                            {
+                                int num_req = v_now.idx_request.size();
+                            
+                                current_index_layer->change_size_RNN(0, current_index_layer->n_in/MAX_BATCH_SIZE * num_req);
+                                checkCUDNN(cudnnRNNForwardInference(cudnnHandle, current_index_layer->rnnDesc, 
+                                                                    1,
+                                                                    current_index_layer->xDesc,
+                                                                    current_index_layer->srcData,
+                                                                    current_index_layer->hxDesc,
+                                                                    current_index_layer->hx,
+                                                                    current_index_layer->cxDesc,
+                                                                    current_index_layer->cx,
+                                                                    current_index_layer->weightDesc,
+                                                                    current_index_layer->weight,
+                                                                    current_index_layer->yDesc,
+                                                                    current_index_layer->dstData,
+                                                                    current_index_layer->hyDesc,
+                                                                    current_index_layer->hy,
+                                                                    current_index_layer->cyDesc,
+                                                                    current_index_layer->cy,
+                                                                    current_index_layer->workSpace,
+                                                                    current_index_layer->sizeInBytes));
+            
+                                double now = get_current_time(start);
+                                printf("Passed layer %d at time %lfms\n\n", v_now.idx_layer, now);
+                                bool req_notyet = false;
+                                vector<int>::iterator iter=v_now.idx_request.begin();
+                                
+                                if(current_index_layer->layerType != RNN_LAST){
+                                    v_now.idx_layer += 1;                  
+                                    v_layer.push_back(v_now);
+                                    if(merge_request(&v_layer)){
+                                        printf("merged!\n");
+                                    }
+                                }
+                                else{
+                                    for(; iter!=v_now.idx_request.end(); iter++){
+                                        if(current_unroll_request.at(*iter) < unroll_request.at(*iter)-1){
+                                            current_unroll_request.at(*iter) += 1;
+                                            req_notyet = true;
+                                        }
+                                    }    
+                                    /* need to separate passed req and not-passed req filename the vector */
+                                    if(req_notyet > 0){
+                                        v_now.idx_layer = 4;
+                                        v_layer.push_back(v_now);
+                                    }
+                                    if(req_notyet==0){
+                                        for(iter = v_now.idx_request.begin(); iter != v_now.idx_request.end(); iter++){
+                                            current_unroll_request.at(*iter) = 0;
+                                        }
+            
+                                        int request_done = v_now.idx_request.size();
+                                        model.data_first += request_done;
+                                        model.data_num -= request_done;
+                                        
+                                        printf("--------------------------------------------\n");
+                                        for(iter=v_now.idx_request.begin(); iter!=v_now.idx_request.end(); iter++){
+                                            latency_request.at(*iter) += now;
+                                            printf("| %lfms, latency of request no.%d : %lfms |\n", now, *iter, latency_request.at(*iter));
+                                        }
+                                        printf("--------------------------------------------\n");
+                                        
+                                        if(index_request == total_request_num) exit(0);
+                                    }                
+                                }
+                            }
+                        break;
                     }
                 }
-                else if(current_index_layer->layerType == POOL || current_index_layer->layerType == POOL_AVERAGE){
-    
-                    std::cout<<"[Note] Pooling Layer"<<std::endl;
-                    
-                    int num_req = v_now.idx_request.size();
-                    printf("num req : %d\n", num_req);
-                    checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->srcTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_in/MAX_BATCH_SIZE*num_req, current_index_layer->c_in, current_index_layer->h_in, current_index_layer->w_in));
-                    checkCUDNN(cudnnGetPooling2dForwardOutputDim(current_index_layer->poolingDesc, current_index_layer->srcTensorDesc, &current_index_layer->n_out, &current_index_layer->c_out, &current_index_layer->h_out, &current_index_layer->w_out));
-                    checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->dstTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
-                    
-                    checkCUDNN(cudnnPoolingForward( cudnnHandle, current_index_layer->poolingDesc, &alpha, current_index_layer->srcTensorDesc,
-                        current_index_layer->srcData,
-                        &beta,
-                        current_index_layer->dstTensorDesc,
-                        current_index_layer->dstData));
-                    double now = get_current_time(start);
-                    printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
-                    v_now.idx_layer += 1;
-                    
-                    if(v_now.idx_layer >= MAX_LAYER_NUM){
-                        int request_done = v_now.idx_request.size();
-                        model.data_first += request_done;
-                        model.data_num -= request_done;
-                    }
-                    else{
-                        v_layer.push_back(v_now);
-                        if(merge_request(&v_layer)){
-                            printf("merged!\n");
-                        }
-                    }
-                }
-                else{
-    
-                    if(idx_end>0){
-                        struct vector_layer v_next = v_layer[idx_end-1];
-                        if(v_next.idx_layer == v_now.idx_layer +1){
-                            // int n_in = model.list_layer[v_next.idx_layer]->n_in;
-                            // int c_in = model.list_layer[v_next.idx_layer]->c_in;
-                            // int h_in = model.list_layer[v_next.idx_layer]->h_in;
-                            // int w_in = model.list_layer[v_next.idx_layer]->w_in;
-                            // checkCuda(cudaMemcpy(model.list_layer[v_next.idx_layer]->tempData, model.list_layer[v_next.idx_layer]->srcData,
-                            //     n_in*c_in*h_in*w_in*sizeof(value_type), cudaMemcpyDeviceToDevice));
-                        }
-                    }
-    
-                    checkCUDNN(cudnnRNNForwardInference(cudnnHandle, current_index_layer->rnnDesc, 
-                                                        1,
-                                                        current_index_layer->xDesc,
+                else if(MODEL_TYPE==1){
+                    if(current_index_layer->layerType == CONV || current_index_layer->layerType == CONV_LAST || current_index_layer->layerType == CONV_RESIDUAL){
+                        int num_req = v_now.idx_request.size();
+                        printf("num req : %d\n", num_req);
+                        checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->srcTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_in/MAX_BATCH_SIZE*num_req, current_index_layer->c_in, current_index_layer->h_in, current_index_layer->w_in));
+                        checkCUDNN(cudnnGetConvolution2dForwardOutputDim(current_index_layer->convDesc, current_index_layer->srcTensorDesc, current_index_layer->filterDesc, &current_index_layer->n_out, &current_index_layer->c_out, &current_index_layer->h_out, &current_index_layer->w_out));
+                        checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->biasTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
+                        checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->dstTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
+        
+        
+                        checkCUDNN(cudnnConvolutionForward( cudnnHandle, &alpha, current_index_layer->srcTensorDesc,
                                                         current_index_layer->srcData,
-                                                        current_index_layer->hxDesc,
-                                                        current_index_layer->hx,
-                                                        current_index_layer->cxDesc,
-                                                        current_index_layer->cx,
-                                                        current_index_layer->weightDesc,
-                                                        current_index_layer->weight,
-                                                        current_index_layer->yDesc,
-                                                        current_index_layer->dstData,
-                                                        current_index_layer->hyDesc,
-                                                        current_index_layer->hy,
-                                                        current_index_layer->cyDesc,
-                                                        current_index_layer->cy,
+                                                        current_index_layer->filterDesc,
+                                                        current_index_layer->filterData,
+                                                        current_index_layer->convDesc,
+                                                        current_index_layer->fwdAlgo,
                                                         current_index_layer->workSpace,
-                                                        current_index_layer->sizeInBytes));
-                    double now = get_current_time(start);
-                    printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
-                    
-                    vector<int>::iterator iter=v_now.idx_request.begin();
-                    
-                    bool req_passed = false;
-                    for(; iter!=v_now.idx_request.end(); iter++){
-                        if(request_current_unroll.at(*iter) < request_unroll.at(*iter) -1){
-                            request_current_unroll.at(*iter) += 1;
-                            req_passed = true;
+                                                        current_index_layer->sizeInBytes,
+                                                        &beta,
+                                                        current_index_layer->dstTensorDesc,
+                                                        current_index_layer->dstData));
+        
+                        if(current_index_layer->layerType == CONV_RESIDUAL){
+                            Layer* bias_layer = model.list_layer[current_index_layer->idx -3];
+                            current_index_layer->biasData = bias_layer->dstData;
+                            
+                            checkCUDNN(cudnnAddTensor( cudnnHandle, 
+                                &alpha, 
+                                current_index_layer->biasTensorDesc,
+                                current_index_layer->biasData,
+                                &beta,
+                                current_index_layer->dstTensorDesc,
+                                current_index_layer->dstData
+                              ));
                         }
-                    }
-    
-                    /* need to separate passed req and not-passed req in the vector */
-                    if(req_passed > 0) v_layer.push_back(v_now);
-                    if(req_passed==0){
+                        double now = get_current_time(start);
+                        printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
                         v_now.idx_layer += 1;
+        
                         if(v_now.idx_layer >= MAX_LAYER_NUM){
                             int request_done = v_now.idx_request.size();
                             model.data_first += request_done;
                             model.data_num -= request_done;
+        
+                            vector<int>::iterator iter=v_now.idx_request.begin();
+                        
+                            for(; iter!=v_now.idx_request.end(); iter++){
+        
+                                latency_request.at(*iter) += now;
+                                printf("%lfms, latency of request no.%d : %lfms\n\n", now, *iter, latency_request.at(*iter));
+                            }
+        
+                            if(index_request == total_request_num) exit(0);
                         }
                         else{
                             v_layer.push_back(v_now);
@@ -369,7 +429,109 @@ int main(int argc, char **argv)
                             }
                         }
                     }
+                    else if(current_index_layer->layerType == POOL || current_index_layer->layerType == POOL_AVERAGE){
+        
+                        std::cout<<"[Note] Pooling Layer"<<std::endl;
+                        
+                        int num_req = v_now.idx_request.size();
+                        printf("num req : %d\n", num_req);
+                        checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->srcTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_in/MAX_BATCH_SIZE*num_req, current_index_layer->c_in, current_index_layer->h_in, current_index_layer->w_in));
+                        checkCUDNN(cudnnGetPooling2dForwardOutputDim(current_index_layer->poolingDesc, current_index_layer->srcTensorDesc, &current_index_layer->n_out, &current_index_layer->c_out, &current_index_layer->h_out, &current_index_layer->w_out));
+                        checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->dstTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
+        
+                        checkCUDNN(cudnnPoolingForward( cudnnHandle, current_index_layer->poolingDesc, &alpha, current_index_layer->srcTensorDesc,
+                            current_index_layer->srcData,
+                            &beta,
+                            current_index_layer->dstTensorDesc,
+                            current_index_layer->dstData));
+                        double now = get_current_time(start);
+                        printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
+                        v_now.idx_layer += 1;
+                        
+                        if(v_now.idx_layer >= MAX_LAYER_NUM){
+                            int request_done = v_now.idx_request.size();
+                            model.data_first += request_done;
+                            model.data_num -= request_done;
+        
+                            if(index_request == total_request_num) exit(0);
+                        }
+                        else{
+                            v_layer.push_back(v_now);
+                            if(merge_request(&v_layer)){
+                                printf("merged!\n");
+                            }
+                        }
+                    }
+                    else{
+                        if(idx_end>0){
+                            struct vector_layer v_next = v_layer[idx_end-1];
+                            if(v_next.idx_layer == v_now.idx_layer +1){
+                                // int n_in = model.list_layer[v_next.idx_layer]->n_in;
+                                // int c_in = model.list_layer[v_next.idx_layer]->c_in;
+                                // int h_in = model.list_layer[v_next.idx_layer]->h_in;
+                                // int w_in = model.list_layer[v_next.idx_layer]->w_in;
+                                // checkCuda(cudaMemcpy(model.list_layer[v_next.idx_layer]->tempData, model.list_layer[v_next.idx_layer]->srcData,
+                                //     n_in*c_in*h_in*w_in*sizeof(value_type), cudaMemcpyDeviceToDevice));
+                            }
+                        }
+                        checkCUDNN(cudnnRNNForwardInference(cudnnHandle, current_index_layer->rnnDesc, 
+                                                            1,
+                                                            current_index_layer->xDesc,
+                                                            current_index_layer->srcData,
+                                                            current_index_layer->hxDesc,
+                                                            current_index_layer->hx,
+                                                            current_index_layer->cxDesc,
+                                                            current_index_layer->cx,
+                                                            current_index_layer->weightDesc,
+                                                            current_index_layer->weight,
+                                                            current_index_layer->yDesc,
+                                                            current_index_layer->dstData,
+                                                            current_index_layer->hyDesc,
+                                                            current_index_layer->hy,
+                                                            current_index_layer->cyDesc,
+                                                            current_index_layer->cy,
+                                                            current_index_layer->workSpace,
+                                                            current_index_layer->sizeInBytes));
+                        double now = get_current_time(start);
+                        printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
+                        
+                        vector<int>::iterator iter=v_now.idx_request.begin();
+                        
+                        bool req_notyet = false;
+                        for(; iter!=v_now.idx_request.end(); iter++){
+                            if(current_unroll_request.at(*iter) < unroll_request.at(*iter)-1){
+                                current_unroll_request.at(*iter) += 1;
+                                req_notyet = true;
+                            }
+                        }
+        
+                        /* need to separate passed req and not-passed req filename the vector */
+                        if(req_notyet > 0){
+                            v_layer.push_back(v_now);
+                        }
+                        if(req_notyet==0){
+                            for(iter = v_now.idx_request.begin(); iter != v_now.idx_request.end(); iter++){
+                                current_unroll_request.at(*iter) = 0;
+                            }
+        
+                            v_now.idx_layer += 1;
+                            if(v_now.idx_layer >= MAX_LAYER_NUM){
+                                int request_done = v_now.idx_request.size();
+                                model.data_first += request_done;
+                                model.data_num -= request_done;
+        
+                                if(index_request == total_request_num) break;
+                            }
+                            else{
+                                v_layer.push_back(v_now);
+                                if(merge_request(&v_layer)){
+                                    printf("merged!\n");
+                                }
+                            }
+                        }
+                    }
                 }
+
 
             }
             if(sig_end) break;
