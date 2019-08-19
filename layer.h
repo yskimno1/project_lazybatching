@@ -259,3 +259,49 @@ public:
     friend struct Network;
 };
 
+#define ASSERT_EQ(A, B) {  \
+  if((A)!=(B)) { printf("\n\n[CNMEM FAILED]\n"); this->printCnmemMemoryUsage(); assert(0); }        \
+}
+
+#define FatalError(s) {                                                \
+    std::stringstream _where, _message;                                \
+    _where << __FILE__ << ':' << __LINE__;                             \
+    _message << std::string(s) + "\n" << __FILE__ << ':' << __LINE__;\
+    std::cerr << _message.str() << "\nAborting...\n";                  \
+    cudaDeviceReset();                                                 \
+    exit(EXIT_FAILURE);                                                \
+}
+
+#define checkCUDNN(status) {                                           \
+    std::stringstream _error;                                          \
+    if (status != CUDNN_STATUS_SUCCESS) {                              \
+      _error << "CUDNN failure: " << status;                           \
+      FatalError(_error.str());                                        \
+    }                                                                  \
+}
+
+#define checkCUBLAS(status) {                                          \
+    std::stringstream _error;                                          \
+    if (status != CUBLAS_STATUS_SUCCESS) {                              \
+      _error << "CUBLAS failure: " << status;                           \
+      FatalError(_error.str());                                        \
+    }                                                                  \
+}
+
+#define checkCudaErrors(status) {                                      \
+    std::stringstream _error;                                          \
+    if (status != 0) {                                                 \
+      _error << "Cuda failure: " << status;                            \
+      assert(0);                                                        \
+      FatalError(_error.str());                                        \
+    }                                                                  \
+}
+
+inline
+cudaError_t checkCuda(cudaError_t result)
+{
+  if (result != cudaSuccess) {
+    fprintf(stderr, "CUDA Runtime Error: %s\n", cudaGetErrorString(result));
+  }
+  return result;
+}
