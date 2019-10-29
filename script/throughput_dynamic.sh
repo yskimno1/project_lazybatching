@@ -1,15 +1,10 @@
 #!/bin/sh
 
-python throughput.py dynamic_poisson_0.1ms
-python throughput.py dynamic_poisson_0.25ms
-python throughput.py dynamic_poisson_0.5ms
-python throughput.py dynamic_poisson_1.0ms
-python throughput.py dynamic_poisson_2.0ms
+
 python throughput.py dynamic_poisson_4.0ms
 python throughput.py dynamic_poisson_8.0ms
 python throughput.py dynamic_poisson_16.0ms
 python throughput.py dynamic_poisson_32.0ms
-python throughput.py dynamic_poisson_64.0ms
 
 
 # python throughput.py dynamic_0.05ms

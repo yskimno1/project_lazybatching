@@ -23,6 +23,8 @@
 #define LAYER
 #endif
 
+
+
 struct Model_layer{
     Layer* list_layer[MAX_LAYER_NUM];
 

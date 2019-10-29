@@ -20,6 +20,9 @@
 #include <time.h>
 #include <pthread.h>
 
+#include <algorithm>
+#include <random>
+
 #ifdef USE_CPP_11
 #include <thread>
 #endif
@@ -113,6 +116,8 @@ int main(int argc, char **argv)
     int total_request_num;
     int fixed_seq_length = 5;
     
+    vector<int> seq_length;
+
     ifstream filename(argv[1]);
     char buf[100];
     if(filename.is_open()){
@@ -121,9 +126,21 @@ int main(int argc, char **argv)
             if(strlen(buf)) vector_request.push_back(atof(buf));
         }
         total_request_num = vector_request.size();
-        std::cout<<"Number of requests: "<<total_request_num<<std::endl;
+        int multiple = total_request_num/100;
+        int remain = total_request_num % 100;
+        for(int i=0; i<20 * multiple + remain; i++) seq_length.push_back(5);
+        for(int i=0; i<45 * multiple; i++) seq_length.push_back(15);
+        for(int i=0; i<25 * multiple; i++) seq_length.push_back(25);
+        for(int i=0; i<10 * multiple; i++) seq_length.push_back(35);
+
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(seq_length.begin(), seq_length.end(), g);
+        for(int i=0; i<100*multiple; i++) printf("seq at %d: %d\n", i, seq_length.at(i));
+
         for(int i=0; i<total_request_num; i++){
-            unroll_request.push_back(fixed_seq_length);
+            // unroll_request.push_back(fixed_seq_length);
+            unroll_request.push_back(seq_length.at(i));
             current_unroll_request.push_back(0);
             latency_request.push_back(-vector_request.at(i));
         }
@@ -204,7 +221,6 @@ int main(int argc, char **argv)
 
                 v_layer.pop_back();
                 Layer* current_index_layer = model.list_layer[v_now.idx_layer];
-
 
                 if(MODEL_TYPE==2){
                     switch (current_index_layer->layerType){

@@ -32,6 +32,8 @@
 
 #define MODEL_TYPE 2
 #define MAX_LAYER_NUM 9
+/*  9 for MODEL_TYPE 2, 52 for MODEL_TYPE 1 */
+#define DEADLINE 1000
 
 #define MAX_BATCH_SIZE 16
 #define MAX_REQ_SIZE 16

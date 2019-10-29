@@ -8,8 +8,9 @@ parser.add_argument('interval', type=float, help='interval between requests')
 
 args = parser.parse_args()
 # print(args.number)
+s = "uniform_" + str(args.interval) + ".txt"
 
-f = open('requests.txt', 'w')
+f = open(s, 'w')
 for i in range(args.number):
   req = (1000 + args.interval * i)
   req = round(req, 4);

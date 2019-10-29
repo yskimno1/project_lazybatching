@@ -20,6 +20,9 @@
 #include <time.h>
 #include <pthread.h>
 
+#include <algorithm>
+#include <random>
+
 #ifdef USE_CPP_11
 #include <thread>
 #endif
@@ -63,10 +66,6 @@ struct Model_layer createModel(int type, cublasHandle_t cublasHandle, cudnnHandl
     return model;
 }
 
-bool make_delay(void){
-    return true;
-}
-
 double get_current_time(clock_t start){
     clock_t now = clock();
     return (double)(now-start)/ CLOCKS_PER_SEC*1000;
@@ -77,6 +76,45 @@ struct vector_layer{
     vector<int> idx_request;
     int seqlength;
 };
+
+bool schedule(double time_request_started, int index_request, vector<float> vector_request, vector<struct vector_layer> v_layer, vector<int>unroll_request, clock_t start){
+    if(v_layer.size()<=0) return true;
+
+    bool result = true;
+    float oldest_time;
+    float oldest_waited_time;
+    struct vector_layer v_now = v_layer[0];
+
+    oldest_time = vector_request.at(v_now.idx_request.at(0));
+    double now = get_current_time(start);
+    oldest_waited_time = now - oldest_time;
+
+    int total_request_num = vector_request.size();
+
+    if(MODEL_TYPE==1){
+        // static exec time : 0.03ms
+        if(oldest_waited_time + total_request_num * 0.03 * MAX_LAYER_NUM > DEADLINE) result = false;
+        else result = true;
+    }
+    else if(MODEL_TYPE==2){
+        float encoder_time, decoder_time;
+        encoder_time = 0;
+        decoder_time = 0;
+
+        vector<int>::iterator iter=v_now.idx_request.begin();
+        for(; iter!=v_now.idx_request.end(); iter++){
+            encoder_time += HIDDEN_SIZE_GNMT * 0.002 * 4;
+            decoder_time += 0.4 * 35 * 5;
+        }
+
+        if(oldest_waited_time + encoder_time + decoder_time > DEADLINE) result = false;
+        else result = true;
+    }
+
+    if(result) printf("                       Schedule: TRUE\n");
+    else printf("                       Schedule: FALSE\n");
+    return result;
+}
 
 struct vector_layer set_vector(int idx_layer, int index_request, int seqlength){
     struct vector_layer new_vector;
@@ -111,8 +149,11 @@ int main(int argc, char **argv)
     vector<int> unroll_request;
     vector<int> current_unroll_request;
     int total_request_num;
-    int fixed_seq_length = 5;
+    int fixed_seq_length = 10;
+
+    vector<int> seq_length;
     
+
     ifstream filename(argv[1]);
     char buf[100];
     if(filename.is_open()){
@@ -120,10 +161,25 @@ int main(int argc, char **argv)
             filename.getline(buf, 100, ',');
             if(strlen(buf)) vector_request.push_back(atof(buf));
         }
+        
         total_request_num = vector_request.size();
+        int multiple = total_request_num/100;
+        int remain = total_request_num % 100;
+        for(int i=0; i<20 * multiple + remain; i++) seq_length.push_back(5);
+        for(int i=0; i<45 * multiple; i++) seq_length.push_back(15);
+        for(int i=0; i<25 * multiple; i++) seq_length.push_back(25);
+        for(int i=0; i<10 * multiple; i++) seq_length.push_back(35);
+
+
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(seq_length.begin(), seq_length.end(), g);
+        for(int i=0; i<100*multiple; i++) printf("seq at %d: %d\n", i, seq_length.at(i));
+
         std::cout<<"Number of requests: "<<total_request_num<<std::endl;
         for(int i=0; i<total_request_num; i++){
-            unroll_request.push_back(fixed_seq_length);
+            // unroll_request.push_back(fixed_seq_length);
+            unroll_request.push_back(seq_length.at(i));
             current_unroll_request.push_back(0);
             latency_request.push_back(-vector_request.at(i));
         }
@@ -153,10 +209,13 @@ int main(int argc, char **argv)
 
     struct Model_layer model = createModel(MODEL_TYPE, cublasHandle, cudnnHandle, myStream_compute, myStream_mem);
 
+    vector<double> execution_time_per_layer;
+
     clock_t start;
     start = clock();
     bool stall_request;
     int index_request = 0;
+    int count_deadline = 0;
     while(index_request <= total_request_num){
         
         stall_request = false;
@@ -164,8 +223,8 @@ int main(int argc, char **argv)
     
         double time_request_started = get_current_time(start);
         if(stall_request==false && index_request != total_request_num &&
-                    time_request_started > vector_request.at(index_request)){ 
-                    
+                    time_request_started > vector_request.at(index_request) && schedule(time_request_started, index_request, vector_request, v_layer, unroll_request, start)==true){ 
+
             struct vector_layer v_new = set_vector(0, index_request, unroll_request.at(index_request));
             v_layer.push_back(v_new);
             index_request += 1;
@@ -176,7 +235,7 @@ int main(int argc, char **argv)
         }
         else{
             if(v_layer.size() <= 0) continue;
-            std::cout<<"current req num: "<<model.data_num<<", starts at "<<model.data_first<<std::endl;
+            // std::cout<<"current req num: "<<model.data_num<<", starts at "<<model.data_first<<std::endl;
 
             int idx_end = v_layer.size()-1;
             struct vector_layer v_now = v_layer[idx_end];
@@ -188,7 +247,7 @@ int main(int argc, char **argv)
                 switch (current_index_layer->layerType){
                     case(ATTENTION):
                         {
-                            std::cout<<"Attention Layer"<<std::endl;
+                            // std::cout<<"Attention Layer"<<std::endl;
                             int num_req = v_now.idx_request.size();
                             
                             
@@ -264,6 +323,11 @@ int main(int argc, char **argv)
                                 for(; iter!=v_now.idx_request.end(); iter++){   
                                     latency_request.at(*iter) += now;
                                     printf("%lfms, latency of request no.%d : %lfms\n\n", now, *iter, latency_request.at(*iter));
+                                    if(latency_request.at(*iter) > DEADLINE) count_deadline += 1;
+                                    if(*iter == total_request_num-1){
+                                        printf("over deadline: %d\n", count_deadline);
+                                    }
+                                    
                                 }
                                 if(index_request == total_request_num) exit(0);
                             }
@@ -303,7 +367,7 @@ int main(int argc, char **argv)
                                                                 current_index_layer->sizeInBytes));
         
                             double now = get_current_time(start);
-                            printf("Passed layer %d at time %lfms\n\n", v_now.idx_layer, now);
+                            std::cout<<"Passed index "<<v_now.idx_layer<<" at time "<<now<<"ms\n"<<std::endl;
                             bool req_notyet = false;
                             vector<int>::iterator iter=v_now.idx_request.begin();
                             
@@ -339,6 +403,10 @@ int main(int argc, char **argv)
                                     for(iter=v_now.idx_request.begin(); iter!=v_now.idx_request.end(); iter++){
                                         latency_request.at(*iter) += now;
                                         printf("| %lfms, latency of request no.%d : %lfms |\n", now, *iter, latency_request.at(*iter));
+                                        if(latency_request.at(*iter) > DEADLINE) count_deadline += 1;
+                                        if(*iter == total_request_num-1){
+                                            printf("over deadline: %d\n", count_deadline);
+                                        }
                                     }
                                     printf("--------------------------------------------\n");
                                     
@@ -352,12 +420,11 @@ int main(int argc, char **argv)
             else if(MODEL_TYPE==1){
                 if(current_index_layer->layerType == CONV || current_index_layer->layerType == CONV_LAST || current_index_layer->layerType == CONV_RESIDUAL){
                     int num_req = v_now.idx_request.size();
-                    printf("num req : %d\n", num_req);
+
                     checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->srcTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_in/MAX_BATCH_SIZE*num_req, current_index_layer->c_in, current_index_layer->h_in, current_index_layer->w_in));
                     checkCUDNN(cudnnGetConvolution2dForwardOutputDim(current_index_layer->convDesc, current_index_layer->srcTensorDesc, current_index_layer->filterDesc, &current_index_layer->n_out, &current_index_layer->c_out, &current_index_layer->h_out, &current_index_layer->w_out));
                     checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->biasTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
                     checkCUDNN(cudnnSetTensor4dDescriptor(current_index_layer->dstTensorDesc, current_index_layer->tensorFormat, current_index_layer->dataType, current_index_layer->n_out, current_index_layer->c_out, current_index_layer->h_out, current_index_layer->w_out));
-    
     
                     checkCUDNN(cudnnConvolutionForward( cudnnHandle, &alpha, current_index_layer->srcTensorDesc,
                                                     current_index_layer->srcData,
@@ -385,7 +452,7 @@ int main(int argc, char **argv)
                           ));
                     }
                     double now = get_current_time(start);
-                    printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
+                    // printf("Passed index %d at time %lfms\n\n", v_now.idx_layer, now);
                     v_now.idx_layer += 1;
     
                     if(v_now.idx_layer >= MAX_LAYER_NUM){
@@ -399,9 +466,15 @@ int main(int argc, char **argv)
     
                             latency_request.at(*iter) += now;
                             printf("%lfms, latency of request no.%d : %lfms\n\n", now, *iter, latency_request.at(*iter));
+                            if(latency_request.at(*iter) > DEADLINE) count_deadline += 1;
+                            if(*iter == total_request_num-1){
+                                printf("over deadline: %d\n", count_deadline);
+                            }
                         }
     
-                        if(index_request == total_request_num) exit(0);
+                        if(index_request == total_request_num){
+                            exit(0);
+                        }
                     }
                     else{
                         v_layer.push_back(v_now);

@@ -1,36 +1,19 @@
 #/usr/bin/bash
 
 
-grep latency dynamic_poisson_0.1ms > grepdata
-echo 'interval 0.1'
-python parser.py
-grep latency dynamic_poisson_0.25ms > grepdata
-echo 'interval 0.25'
-python parser.py
-grep latency dynamic_poisson_0.5ms > grepdata
-echo 'interval 0.5'
-python parser.py
-grep latency dynamic_poisson_1.0ms > grepdata
-echo 'interval 1'
-python parser.py
-grep latency dynamic_poisson_2.0ms > grepdata
-echo 'interval 2'
-python parser.py
-grep latency dynamic_poisson_4.0ms > grepdata
+grep latency dynamic_uniform_4.0ms > grepdata
 echo 'interval 4'
 python parser.py
-grep latency dynamic_poisson_8.0ms > grepdata
+grep latency dynamic_uniform_8.0ms > grepdata
 echo 'interval 8'
 python parser.py
-grep latency dynamic_poisson_16.0ms > grepdata
+grep latency dynamic_uniform_16.0ms > grepdata
 echo 'interval 16'
 python parser.py
-grep latency dynamic_poisson_32.0ms > grepdata
+grep latency dynamic_uniform_32.0ms > grepdata
 echo 'interval 32'
 python parser.py
-grep latency dynamic_poisson_64.0ms > grepdata
-echo 'interval 64'
-python parser.py
+
 # grep latency dynamic_0.25ms > grepdata 
 # echo 'interval 0.25'
 # python parser.py

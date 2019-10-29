@@ -55,7 +55,7 @@ struct Model_layer create_GNMT(cublasHandle_t cublasHandle, cudnnHandle_t cudnnH
         0, 0, 0, 0,
         0, 0, 0,
         MAX_BATCH_SIZE, 0, 0, 0,
-        seq_length_GNMT, HIDDEN_SIZE_GNMT, num_layers_GNMT, 0);
+        HIDDEN_SIZE_GNMT, HIDDEN_SIZE_GNMT, num_layers_GNMT, 0);
 
     model.list_layer[1] = new Layer(RNN, &cublasHandle,  &cudnnHandle, &myStream_compute, &myStream_mem,
         MAX_BATCH_SIZE, 0, 0, 0,
