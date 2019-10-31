@@ -30,13 +30,13 @@
 #define MODE_DYNAMIC 0
 #define DYNAMIC_TERM 100
 
-#define MODEL_TYPE 2
-#define MAX_LAYER_NUM 9
+#define MODEL_TYPE 1
+#define MAX_LAYER_NUM 52
 /*  9 for MODEL_TYPE 2, 52 for MODEL_TYPE 1 */
 #define DEADLINE 1000
 
-#define MAX_BATCH_SIZE 16
-#define MAX_REQ_SIZE 16
+#define MAX_BATCH_SIZE 32
+#define MAX_REQ_SIZE 32
 
 #define HIDDEN_SIZE_GNMT 1024
 
