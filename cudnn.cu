@@ -78,7 +78,10 @@ struct vector_layer{
 };
 
 bool schedule(double time_request_started, int index_request, vector<float> vector_request, vector<struct vector_layer> v_layer, vector<int>unroll_request, clock_t start){
-    if(v_layer.size()<=0) return true;
+
+    if(v_layer.size()<=0){
+        return true;
+    }
 
     bool result = true;
     float oldest_time;
@@ -93,7 +96,7 @@ bool schedule(double time_request_started, int index_request, vector<float> vect
 
     if(MODEL_TYPE==1){
         // static exec time : 0.03ms
-        if(oldest_waited_time + total_request_num * 0.03 * MAX_LAYER_NUM > DEADLINE) result = false;
+        if(oldest_waited_time + 10.0 > DEADLINE) result = false;
         else result = true;
     }
     else if(MODEL_TYPE==2){
@@ -152,7 +155,8 @@ int main(int argc, char **argv)
     int fixed_seq_length = 10;
 
     vector<int> seq_length;
-    
+
+    vector<double> time_execution_start;
 
     ifstream filename(argv[1]);
     char buf[100];
@@ -174,7 +178,6 @@ int main(int argc, char **argv)
         std::random_device rd;
         std::mt19937 g(rd());
         std::shuffle(seq_length.begin(), seq_length.end(), g);
-        for(int i=0; i<100*multiple; i++) printf("seq at %d: %d\n", i, seq_length.at(i));
 
         std::cout<<"Number of requests: "<<total_request_num<<std::endl;
         for(int i=0; i<total_request_num; i++){
@@ -216,24 +219,39 @@ int main(int argc, char **argv)
     bool stall_request;
     int index_request = 0;
     int count_deadline = 0;
+    bool sig_fully_batch = false;
     while(index_request <= total_request_num){
         
+        if(v_layer.size()==0) sig_fully_batch = false;
         stall_request = false;
         if(model.data_num >= MAX_REQ_SIZE)    stall_request = true;
     
         double time_request_started = get_current_time(start);
-        if(stall_request==false && index_request != total_request_num &&
-                    time_request_started > vector_request.at(index_request) && schedule(time_request_started, index_request, vector_request, v_layer, unroll_request, start)==true){ 
-
+        if((sig_fully_batch && stall_request==false && index_request != total_request_num) || (stall_request==false && index_request != total_request_num &&
+                    time_request_started > vector_request.at(index_request) && schedule(time_request_started, index_request, vector_request, v_layer, unroll_request, start)==true)){ 
+            
             struct vector_layer v_new = set_vector(0, index_request, unroll_request.at(index_request));
             v_layer.push_back(v_new);
             index_request += 1;
             model.data_num += 1;
+
+            if(v_layer.size() == 1){
+                /* if always false? */
+                double oldest_time = vector_request.at(v_layer[0].idx_request.at(0));
+                double oldest_waited_time = time_request_started - oldest_time;
+                if(oldest_waited_time >= DEADLINE){
+                    printf("fully batch!\n");
+                    sig_fully_batch = true;
+                }
+            }
+
+            time_execution_start.push_back(time_request_started);
             std::cout<<"                       --came at time : "<<time_request_started<<"--"<<std::endl;
             std::cout<<"                       --input index : "<<index_request<<"--"<<std::endl;
             if(merge_request(&v_layer))               std::cout<<"                 merged!\n"<<std::endl;
         }
         else{
+            
             if(v_layer.size() <= 0) continue;
             // std::cout<<"current req num: "<<model.data_num<<", starts at "<<model.data_first<<std::endl;
 
@@ -323,6 +341,7 @@ int main(int argc, char **argv)
                                 for(; iter!=v_now.idx_request.end(); iter++){   
                                     latency_request.at(*iter) += now;
                                     printf("%lfms, latency of request no.%d : %lfms\n\n", now, *iter, latency_request.at(*iter));
+                                    printf("%lfms, execution time of request no.%d: %lfms\n\n", now, *iter, now - time_execution_start.at(*iter));
                                     if(latency_request.at(*iter) > DEADLINE) count_deadline += 1;
                                     if(*iter == total_request_num-1){
                                         printf("over deadline: %d\n", count_deadline);
@@ -403,6 +422,7 @@ int main(int argc, char **argv)
                                     for(iter=v_now.idx_request.begin(); iter!=v_now.idx_request.end(); iter++){
                                         latency_request.at(*iter) += now;
                                         printf("| %lfms, latency of request no.%d : %lfms |\n", now, *iter, latency_request.at(*iter));
+                                        printf("%lfms, execution time of request no.%d: %lfms\n\n", now, *iter, now - time_execution_start.at(*iter));
                                         if(latency_request.at(*iter) > DEADLINE) count_deadline += 1;
                                         if(*iter == total_request_num-1){
                                             printf("over deadline: %d\n", count_deadline);
@@ -466,6 +486,7 @@ int main(int argc, char **argv)
     
                             latency_request.at(*iter) += now;
                             printf("%lfms, latency of request no.%d : %lfms\n\n", now, *iter, latency_request.at(*iter));
+                            printf("%lfms, execution time of request no.%d: %lfms\n\n", now, *iter, now - time_execution_start.at(*iter));
                             if(latency_request.at(*iter) > DEADLINE) count_deadline += 1;
                             if(*iter == total_request_num-1){
                                 printf("over deadline: %d\n", count_deadline);

@@ -1,18 +1,44 @@
 #/usr/bin/bash
 
+PROJECT_PATH=$HOME/XBatch/XBatch/Project
+ARR_INTERVAL=(1.25 2.5 5.0 5.5 6.0 6.5 7.0 7.5 8.5 10.0 20.0 40.0 80.0)
+ARR_BATCH=(16)
 
-grep latency dynamic_uniform_4.0ms > grepdata
-echo 'interval 4'
-python parser.py
-grep latency dynamic_uniform_8.0ms > grepdata
-echo 'interval 8'
-python parser.py
-grep latency dynamic_uniform_16.0ms > grepdata
-echo 'interval 16'
-python parser.py
-grep latency dynamic_uniform_32.0ms > grepdata
-echo 'interval 32'
-python parser.py
+
+echo "-----------X-BATCHING-----------"
+
+for i in ${ARR_INTERVAL[@]}
+do
+    for j in ${ARR_BATCH[@]}
+    do
+        grep latency $PROJECT_PATH/result_anybatch_new/result_anybatch_interval-$i-batch-$j > grepdata
+        echo "interval ${i} batch ${j}"
+        python parser.py        
+    done
+done
+
+echo "--------------------------------"
+echo "--------DYNAMIC BATCHING--------"
+for i in ${ARR_INTERVAL[@]}
+do
+    for j in ${ARR_BATCH[@]}
+    do
+        grep latency $PROJECT_PATH/result_dynamic_new/result_dynamic_interval-$i-batch-$j > grepdata
+        echo "interval ${i} batch ${j}"
+        python parser.py        
+    done
+done
+
+echo "--------------------------------"
+
+
+# for k in ${ARR_BATCH_NEW[@]}
+# do
+#     grep latency $PROJECT_PATH/result_191101/batch_${k}_exec_time_4.txt > grepdata
+#     echo "batch ${k}"
+#     python parser.py    
+# done
+
 
 # grep latency dynamic_0.25ms > grepdata 
 # echo 'interval 0.25'

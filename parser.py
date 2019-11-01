@@ -4,6 +4,7 @@ import sys
 f_read = open('grepdata', 'r')
 
 sum = 0
+count = 0
 while True:
     line = f_read.readline()
     if not line: break
@@ -15,6 +16,7 @@ while True:
     latency = latency.split('m')[0]
     # print(latency)
     sum += float(latency)
+    count += 1
 
-latency = sum / 1000
+latency = sum / count
 print("latency : ", latency)
