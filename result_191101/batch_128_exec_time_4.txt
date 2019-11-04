@@ -1,0 +1,937 @@
+Model Type: 1
+!! current time : 100.002000, 100.001000
+!! current time : 200.003000, 200.002000
+!! current time : 300.003000, 300.003000
+!! current time : 400.004000, 400.003000
+!! current time : 500.005000, 500.004000
+!! current time : 600.006000, 600.005000
+!! current time : 700.007000, 700.006000
+!! current time : 800.008000, 800.007000
+!! current time : 900.009000, 900.008000
+                       --came at time : 1000--
+                       --input index : 1--
+                       --came at time : 1000.03--
+                       --input index : 2--
+
+                 before merge, request size: 1, current size: 2
+                 after merge, request size : 2, current size: 1
+                 merged!
+
+                       --came at time : 1000.05--
+                       --input index : 3--
+
+                 before merge, request size: 2, current size: 2
+                 after merge, request size : 3, current size: 1
+                 merged!
+
+                       --came at time : 1000.06--
+                       --input index : 4--
+
+                 before merge, request size: 3, current size: 2
+                 after merge, request size : 4, current size: 1
+                 merged!
+
+                       --came at time : 1000.07--
+                       --input index : 5--
+
+                 before merge, request size: 4, current size: 2
+                 after merge, request size : 5, current size: 1
+                 merged!
+
+                       --came at time : 1000.07--
+                       --input index : 6--
+
+                 before merge, request size: 5, current size: 2
+                 after merge, request size : 6, current size: 1
+                 merged!
+
+                       --came at time : 1000.08--
+                       --input index : 7--
+
+                 before merge, request size: 6, current size: 2
+                 after merge, request size : 7, current size: 1
+                 merged!
+
+                       --came at time : 1000.09--
+                       --input index : 8--
+
+                 before merge, request size: 7, current size: 2
+                 after merge, request size : 8, current size: 1
+                 merged!
+
+                       --came at time : 1000.1--
+                       --input index : 9--
+
+                 before merge, request size: 8, current size: 2
+                 after merge, request size : 9, current size: 1
+                 merged!
+
+                       --came at time : 1000.11--
+                       --input index : 10--
+
+                 before merge, request size: 9, current size: 2
+                 after merge, request size : 10, current size: 1
+                 merged!
+
+                       --came at time : 1000.12--
+                       --input index : 11--
+
+                 before merge, request size: 10, current size: 2
+                 after merge, request size : 11, current size: 1
+                 merged!
+
+                       --came at time : 1000.12--
+                       --input index : 12--
+
+                 before merge, request size: 11, current size: 2
+                 after merge, request size : 12, current size: 1
+                 merged!
+
+                       --came at time : 1000.13--
+                       --input index : 13--
+
+                 before merge, request size: 12, current size: 2
+                 after merge, request size : 13, current size: 1
+                 merged!
+
+                       --came at time : 1000.14--
+                       --input index : 14--
+
+                 before merge, request size: 13, current size: 2
+                 after merge, request size : 14, current size: 1
+                 merged!
+
+                       --came at time : 1000.15--
+                       --input index : 15--
+
+                 before merge, request size: 14, current size: 2
+                 after merge, request size : 15, current size: 1
+                 merged!
+
+                       --came at time : 1000.16--
+                       --input index : 16--
+
+                 before merge, request size: 15, current size: 2
+                 after merge, request size : 16, current size: 1
+                 merged!
+
+                       --came at time : 1000.17--
+                       --input index : 17--
+
+                 before merge, request size: 16, current size: 2
+                 after merge, request size : 17, current size: 1
+                 merged!
+
+                       --came at time : 1000.18--
+                       --input index : 18--
+
+                 before merge, request size: 17, current size: 2
+                 after merge, request size : 18, current size: 1
+                 merged!
+
+                       --came at time : 1000.19--
+                       --input index : 19--
+
+                 before merge, request size: 18, current size: 2
+                 after merge, request size : 19, current size: 1
+                 merged!
+
+                       --came at time : 1000.2--
+                       --input index : 20--
+
+                 before merge, request size: 19, current size: 2
+                 after merge, request size : 20, current size: 1
+                 merged!
+
+                       --came at time : 1000.21--
+                       --input index : 21--
+
+                 before merge, request size: 20, current size: 2
+                 after merge, request size : 21, current size: 1
+                 merged!
+
+                       --came at time : 1000.22--
+                       --input index : 22--
+
+                 before merge, request size: 21, current size: 2
+                 after merge, request size : 22, current size: 1
+                 merged!
+
+                       --came at time : 1000.22--
+                       --input index : 23--
+
+                 before merge, request size: 22, current size: 2
+                 after merge, request size : 23, current size: 1
+                 merged!
+
+                       --came at time : 1000.23--
+                       --input index : 24--
+
+                 before merge, request size: 23, current size: 2
+                 after merge, request size : 24, current size: 1
+                 merged!
+
+                       --came at time : 1000.24--
+                       --input index : 25--
+
+                 before merge, request size: 24, current size: 2
+                 after merge, request size : 25, current size: 1
+                 merged!
+
+                       --came at time : 1000.25--
+                       --input index : 26--
+
+                 before merge, request size: 25, current size: 2
+                 after merge, request size : 26, current size: 1
+                 merged!
+
+                       --came at time : 1000.26--
+                       --input index : 27--
+
+                 before merge, request size: 26, current size: 2
+                 after merge, request size : 27, current size: 1
+                 merged!
+
+                       --came at time : 1000.27--
+                       --input index : 28--
+
+                 before merge, request size: 27, current size: 2
+                 after merge, request size : 28, current size: 1
+                 merged!
+
+                       --came at time : 1000.28--
+                       --input index : 29--
+
+                 before merge, request size: 28, current size: 2
+                 after merge, request size : 29, current size: 1
+                 merged!
+
+                       --came at time : 1000.29--
+                       --input index : 30--
+
+                 before merge, request size: 29, current size: 2
+                 after merge, request size : 30, current size: 1
+                 merged!
+
+                       --came at time : 1000.3--
+                       --input index : 31--
+
+                 before merge, request size: 30, current size: 2
+                 after merge, request size : 31, current size: 1
+                 merged!
+
+                       --came at time : 1000.31--
+                       --input index : 32--
+
+                 before merge, request size: 31, current size: 2
+                 after merge, request size : 32, current size: 1
+                 merged!
+
+                       --came at time : 1000.32--
+                       --input index : 33--
+
+                 before merge, request size: 32, current size: 2
+                 after merge, request size : 33, current size: 1
+                 merged!
+
+                       --came at time : 1000.33--
+                       --input index : 34--
+
+                 before merge, request size: 33, current size: 2
+                 after merge, request size : 34, current size: 1
+                 merged!
+
+                       --came at time : 1000.34--
+                       --input index : 35--
+
+                 before merge, request size: 34, current size: 2
+                 after merge, request size : 35, current size: 1
+                 merged!
+
+                       --came at time : 1000.35--
+                       --input index : 36--
+
+                 before merge, request size: 35, current size: 2
+                 after merge, request size : 36, current size: 1
+                 merged!
+
+                       --came at time : 1000.36--
+                       --input index : 37--
+
+                 before merge, request size: 36, current size: 2
+                 after merge, request size : 37, current size: 1
+                 merged!
+
+                       --came at time : 1000.37--
+                       --input index : 38--
+
+                 before merge, request size: 37, current size: 2
+                 after merge, request size : 38, current size: 1
+                 merged!
+
+                       --came at time : 1000.38--
+                       --input index : 39--
+
+                 before merge, request size: 38, current size: 2
+                 after merge, request size : 39, current size: 1
+                 merged!
+
+                       --came at time : 1000.39--
+                       --input index : 40--
+
+                 before merge, request size: 39, current size: 2
+                 after merge, request size : 40, current size: 1
+                 merged!
+
+                       --came at time : 1000.4--
+                       --input index : 41--
+
+                 before merge, request size: 40, current size: 2
+                 after merge, request size : 41, current size: 1
+                 merged!
+
+                       --came at time : 1000.41--
+                       --input index : 42--
+
+                 before merge, request size: 41, current size: 2
+                 after merge, request size : 42, current size: 1
+                 merged!
+
+                       --came at time : 1000.42--
+                       --input index : 43--
+
+                 before merge, request size: 42, current size: 2
+                 after merge, request size : 43, current size: 1
+                 merged!
+
+                       --came at time : 1000.43--
+                       --input index : 44--
+
+                 before merge, request size: 43, current size: 2
+                 after merge, request size : 44, current size: 1
+                 merged!
+
+                       --came at time : 1000.44--
+                       --input index : 45--
+
+                 before merge, request size: 44, current size: 2
+                 after merge, request size : 45, current size: 1
+                 merged!
+
+                       --came at time : 1000.45--
+                       --input index : 46--
+
+                 before merge, request size: 45, current size: 2
+                 after merge, request size : 46, current size: 1
+                 merged!
+
+                       --came at time : 1000.46--
+                       --input index : 47--
+
+                 before merge, request size: 46, current size: 2
+                 after merge, request size : 47, current size: 1
+                 merged!
+
+                       --came at time : 1000.47--
+                       --input index : 48--
+
+                 before merge, request size: 47, current size: 2
+                 after merge, request size : 48, current size: 1
+                 merged!
+
+                       --came at time : 1000.48--
+                       --input index : 49--
+
+                 before merge, request size: 48, current size: 2
+                 after merge, request size : 49, current size: 1
+                 merged!
+
+                       --came at time : 1000.49--
+                       --input index : 50--
+
+                 before merge, request size: 49, current size: 2
+                 after merge, request size : 50, current size: 1
+                 merged!
+
+                       --came at time : 1000.5--
+                       --input index : 51--
+
+                 before merge, request size: 50, current size: 2
+                 after merge, request size : 51, current size: 1
+                 merged!
+
+                       --came at time : 1000.51--
+                       --input index : 52--
+
+                 before merge, request size: 51, current size: 2
+                 after merge, request size : 52, current size: 1
+                 merged!
+
+                       --came at time : 1000.52--
+                       --input index : 53--
+
+                 before merge, request size: 52, current size: 2
+                 after merge, request size : 53, current size: 1
+                 merged!
+
+                       --came at time : 1000.53--
+                       --input index : 54--
+
+                 before merge, request size: 53, current size: 2
+                 after merge, request size : 54, current size: 1
+                 merged!
+
+                       --came at time : 1000.54--
+                       --input index : 55--
+
+                 before merge, request size: 54, current size: 2
+                 after merge, request size : 55, current size: 1
+                 merged!
+
+                       --came at time : 1000.55--
+                       --input index : 56--
+
+                 before merge, request size: 55, current size: 2
+                 after merge, request size : 56, current size: 1
+                 merged!
+
+                       --came at time : 1000.56--
+                       --input index : 57--
+
+                 before merge, request size: 56, current size: 2
+                 after merge, request size : 57, current size: 1
+                 merged!
+
+                       --came at time : 1000.57--
+                       --input index : 58--
+
+                 before merge, request size: 57, current size: 2
+                 after merge, request size : 58, current size: 1
+                 merged!
+
+                       --came at time : 1000.58--
+                       --input index : 59--
+
+                 before merge, request size: 58, current size: 2
+                 after merge, request size : 59, current size: 1
+                 merged!
+
+                       --came at time : 1000.59--
+                       --input index : 60--
+
+                 before merge, request size: 59, current size: 2
+                 after merge, request size : 60, current size: 1
+                 merged!
+
+                       --came at time : 1000.6--
+                       --input index : 61--
+
+                 before merge, request size: 60, current size: 2
+                 after merge, request size : 61, current size: 1
+                 merged!
+
+                       --came at time : 1000.61--
+                       --input index : 62--
+
+                 before merge, request size: 61, current size: 2
+                 after merge, request size : 62, current size: 1
+                 merged!
+
+                       --came at time : 1000.62--
+                       --input index : 63--
+
+                 before merge, request size: 62, current size: 2
+                 after merge, request size : 63, current size: 1
+                 merged!
+
+                       --came at time : 1000.63--
+                       --input index : 64--
+
+                 before merge, request size: 63, current size: 2
+                 after merge, request size : 64, current size: 1
+                 merged!
+
+                       --came at time : 1000.64--
+                       --input index : 65--
+
+                 before merge, request size: 64, current size: 2
+                 after merge, request size : 65, current size: 1
+                 merged!
+
+                       --came at time : 1000.65--
+                       --input index : 66--
+
+                 before merge, request size: 65, current size: 2
+                 after merge, request size : 66, current size: 1
+                 merged!
+
+                       --came at time : 1000.66--
+                       --input index : 67--
+
+                 before merge, request size: 66, current size: 2
+                 after merge, request size : 67, current size: 1
+                 merged!
+
+                       --came at time : 1000.67--
+                       --input index : 68--
+
+                 before merge, request size: 67, current size: 2
+                 after merge, request size : 68, current size: 1
+                 merged!
+
+                       --came at time : 1000.68--
+                       --input index : 69--
+
+                 before merge, request size: 68, current size: 2
+                 after merge, request size : 69, current size: 1
+                 merged!
+
+                       --came at time : 1000.69--
+                       --input index : 70--
+
+                 before merge, request size: 69, current size: 2
+                 after merge, request size : 70, current size: 1
+                 merged!
+
+                       --came at time : 1000.7--
+                       --input index : 71--
+
+                 before merge, request size: 70, current size: 2
+                 after merge, request size : 71, current size: 1
+                 merged!
+
+                       --came at time : 1000.71--
+                       --input index : 72--
+
+                 before merge, request size: 71, current size: 2
+                 after merge, request size : 72, current size: 1
+                 merged!
+
+                       --came at time : 1000.72--
+                       --input index : 73--
+
+                 before merge, request size: 72, current size: 2
+                 after merge, request size : 73, current size: 1
+                 merged!
+
+                       --came at time : 1000.73--
+                       --input index : 74--
+
+                 before merge, request size: 73, current size: 2
+                 after merge, request size : 74, current size: 1
+                 merged!
+
+                       --came at time : 1000.74--
+                       --input index : 75--
+
+                 before merge, request size: 74, current size: 2
+                 after merge, request size : 75, current size: 1
+                 merged!
+
+                       --came at time : 1000.75--
+                       --input index : 76--
+
+                 before merge, request size: 75, current size: 2
+                 after merge, request size : 76, current size: 1
+                 merged!
+
+                       --came at time : 1000.76--
+                       --input index : 77--
+
+                 before merge, request size: 76, current size: 2
+                 after merge, request size : 77, current size: 1
+                 merged!
+
+                       --came at time : 1000.77--
+                       --input index : 78--
+
+                 before merge, request size: 77, current size: 2
+                 after merge, request size : 78, current size: 1
+                 merged!
+
+                       --came at time : 1000.78--
+                       --input index : 79--
+
+                 before merge, request size: 78, current size: 2
+                 after merge, request size : 79, current size: 1
+                 merged!
+
+                       --came at time : 1000.79--
+                       --input index : 80--
+
+                 before merge, request size: 79, current size: 2
+                 after merge, request size : 80, current size: 1
+                 merged!
+
+                       --came at time : 1000.8--
+                       --input index : 81--
+
+                 before merge, request size: 80, current size: 2
+                 after merge, request size : 81, current size: 1
+                 merged!
+
+                       --came at time : 1000.81--
+                       --input index : 82--
+
+                 before merge, request size: 81, current size: 2
+                 after merge, request size : 82, current size: 1
+                 merged!
+
+                       --came at time : 1000.82--
+                       --input index : 83--
+
+                 before merge, request size: 82, current size: 2
+                 after merge, request size : 83, current size: 1
+                 merged!
+
+                       --came at time : 1000.83--
+                       --input index : 84--
+
+                 before merge, request size: 83, current size: 2
+                 after merge, request size : 84, current size: 1
+                 merged!
+
+                       --came at time : 1000.84--
+                       --input index : 85--
+
+                 before merge, request size: 84, current size: 2
+                 after merge, request size : 85, current size: 1
+                 merged!
+
+                       --came at time : 1000.85--
+                       --input index : 86--
+
+                 before merge, request size: 85, current size: 2
+                 after merge, request size : 86, current size: 1
+                 merged!
+
+                       --came at time : 1000.86--
+                       --input index : 87--
+
+                 before merge, request size: 86, current size: 2
+                 after merge, request size : 87, current size: 1
+                 merged!
+
+                       --came at time : 1000.87--
+                       --input index : 88--
+
+                 before merge, request size: 87, current size: 2
+                 after merge, request size : 88, current size: 1
+                 merged!
+
+                       --came at time : 1000.88--
+                       --input index : 89--
+
+                 before merge, request size: 88, current size: 2
+                 after merge, request size : 89, current size: 1
+                 merged!
+
+                       --came at time : 1000.89--
+                       --input index : 90--
+
+                 before merge, request size: 89, current size: 2
+                 after merge, request size : 90, current size: 1
+                 merged!
+
+                       --came at time : 1000.9--
+                       --input index : 91--
+
+                 before merge, request size: 90, current size: 2
+                 after merge, request size : 91, current size: 1
+                 merged!
+
+                       --came at time : 1000.91--
+                       --input index : 92--
+
+                 before merge, request size: 91, current size: 2
+                 after merge, request size : 92, current size: 1
+                 merged!
+
+                       --came at time : 1000.92--
+                       --input index : 93--
+
+                 before merge, request size: 92, current size: 2
+                 after merge, request size : 93, current size: 1
+                 merged!
+
+                       --came at time : 1000.93--
+                       --input index : 94--
+
+                 before merge, request size: 93, current size: 2
+                 after merge, request size : 94, current size: 1
+                 merged!
+
+                       --came at time : 1000.94--
+                       --input index : 95--
+
+                 before merge, request size: 94, current size: 2
+                 after merge, request size : 95, current size: 1
+                 merged!
+
+                       --came at time : 1000.95--
+                       --input index : 96--
+
+                 before merge, request size: 95, current size: 2
+                 after merge, request size : 96, current size: 1
+                 merged!
+
+                       --came at time : 1000.96--
+                       --input index : 97--
+
+                 before merge, request size: 96, current size: 2
+                 after merge, request size : 97, current size: 1
+                 merged!
+
+                       --came at time : 1000.97--
+                       --input index : 98--
+
+                 before merge, request size: 97, current size: 2
+                 after merge, request size : 98, current size: 1
+                 merged!
+
+                       --came at time : 1000.98--
+                       --input index : 99--
+
+                 before merge, request size: 98, current size: 2
+                 after merge, request size : 99, current size: 1
+                 merged!
+
+                       --came at time : 1000.99--
+                       --input index : 100--
+
+                 before merge, request size: 99, current size: 2
+                 after merge, request size : 100, current size: 1
+                 merged!
+
+                       --came at time : 1001--
+                       --input index : 101--
+
+                 before merge, request size: 100, current size: 2
+                 after merge, request size : 101, current size: 1
+                 merged!
+
+                       --came at time : 1001.01--
+                       --input index : 102--
+
+                 before merge, request size: 101, current size: 2
+                 after merge, request size : 102, current size: 1
+                 merged!
+
+                       --came at time : 1001.02--
+                       --input index : 103--
+
+                 before merge, request size: 102, current size: 2
+                 after merge, request size : 103, current size: 1
+                 merged!
+
+                       --came at time : 1001.03--
+                       --input index : 104--
+
+                 before merge, request size: 103, current size: 2
+                 after merge, request size : 104, current size: 1
+                 merged!
+
+                       --came at time : 1001.04--
+                       --input index : 105--
+
+                 before merge, request size: 104, current size: 2
+                 after merge, request size : 105, current size: 1
+                 merged!
+
+                       --came at time : 1001.05--
+                       --input index : 106--
+
+                 before merge, request size: 105, current size: 2
+                 after merge, request size : 106, current size: 1
+                 merged!
+
+                       --came at time : 1001.06--
+                       --input index : 107--
+
+                 before merge, request size: 106, current size: 2
+                 after merge, request size : 107, current size: 1
+                 merged!
+
+                       --came at time : 1001.07--
+                       --input index : 108--
+
+                 before merge, request size: 107, current size: 2
+                 after merge, request size : 108, current size: 1
+                 merged!
+
+                       --came at time : 1001.08--
+                       --input index : 109--
+
+                 before merge, request size: 108, current size: 2
+                 after merge, request size : 109, current size: 1
+                 merged!
+
+                       --came at time : 1001.09--
+                       --input index : 110--
+
+                 before merge, request size: 109, current size: 2
+                 after merge, request size : 110, current size: 1
+                 merged!
+
+                       --came at time : 1001.1--
+                       --input index : 111--
+
+                 before merge, request size: 110, current size: 2
+                 after merge, request size : 111, current size: 1
+                 merged!
+
+                       --came at time : 1001.11--
+                       --input index : 112--
+
+                 before merge, request size: 111, current size: 2
+                 after merge, request size : 112, current size: 1
+                 merged!
+
+                       --came at time : 1001.12--
+                       --input index : 113--
+
+                 before merge, request size: 112, current size: 2
+                 after merge, request size : 113, current size: 1
+                 merged!
+
+                       --came at time : 1001.13--
+                       --input index : 114--
+
+                 before merge, request size: 113, current size: 2
+                 after merge, request size : 114, current size: 1
+                 merged!
+
+                       --came at time : 1001.14--
+                       --input index : 115--
+
+                 before merge, request size: 114, current size: 2
+                 after merge, request size : 115, current size: 1
+                 merged!
+
+                       --came at time : 1001.15--
+                       --input index : 116--
+
+                 before merge, request size: 115, current size: 2
+                 after merge, request size : 116, current size: 1
+                 merged!
+
+                       --came at time : 1001.16--
+                       --input index : 117--
+
+                 before merge, request size: 116, current size: 2
+                 after merge, request size : 117, current size: 1
+                 merged!
+
+                       --came at time : 1001.17--
+                       --input index : 118--
+
+                 before merge, request size: 117, current size: 2
+                 after merge, request size : 118, current size: 1
+                 merged!
+
+                       --came at time : 1001.18--
+                       --input index : 119--
+
+                 before merge, request size: 118, current size: 2
+                 after merge, request size : 119, current size: 1
+                 merged!
+
+                       --came at time : 1001.19--
+                       --input index : 120--
+
+                 before merge, request size: 119, current size: 2
+                 after merge, request size : 120, current size: 1
+                 merged!
+
+                       --came at time : 1001.2--
+                       --input index : 121--
+
+                 before merge, request size: 120, current size: 2
+                 after merge, request size : 121, current size: 1
+                 merged!
+
+                       --came at time : 1001.21--
+                       --input index : 122--
+
+                 before merge, request size: 121, current size: 2
+                 after merge, request size : 122, current size: 1
+                 merged!
+
+                       --came at time : 1001.22--
+                       --input index : 123--
+
+                 before merge, request size: 122, current size: 2
+                 after merge, request size : 123, current size: 1
+                 merged!
+
+                       --came at time : 1001.23--
+                       --input index : 124--
+
+                 before merge, request size: 123, current size: 2
+                 after merge, request size : 124, current size: 1
+                 merged!
+
+                       --came at time : 1001.24--
+                       --input index : 125--
+
+                 before merge, request size: 124, current size: 2
+                 after merge, request size : 125, current size: 1
+                 merged!
+
+                       --came at time : 1001.25--
+                       --input index : 126--
+
+                 before merge, request size: 125, current size: 2
+                 after merge, request size : 126, current size: 1
+                 merged!
+
+                       --came at time : 1001.26--
+                       --input index : 127--
+
+                 before merge, request size: 126, current size: 2
+                 after merge, request size : 127, current size: 1
+                 merged!
+
+                       --came at time : 1001.27--
+                       --input index : 128--
+
+                 before merge, request size: 127, current size: 2
+                 after merge, request size : 128, current size: 1
+                 merged!
+
+Passed index 0 at time 1001.320000ms
+
+[Note] Pooling Layer
+num req : 128
+Passed index 1 at time 1001.338000ms
+
+Passed index 2 at time 1001.372000ms
+
+Passed index 3 at time 1001.385000ms
+
+Passed index 4 at time 1001.407000ms
+
+Passed index 5 at time 1001.425000ms
+
+Passed index 6 at time 1001.436000ms
+
+Passed index 7 at time 1001.465000ms
+
+Passed index 8 at time 1001.483000ms
+
+Passed index 9 at time 1001.494000ms
+
+Passed index 10 at time 1001.515000ms
+
+Passed index 11 at time 1001.532000ms
+
+Passed index 12 at time 1001.550000ms
+
+Passed index 13 at time 1001.567000ms
+
+Passed index 14 at time 1001.584000ms
+
+Passed index 15 at time 1001.602000ms
+
+Passed index 16 at time 1001.625000ms
+
